@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
-    <!-- Include Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -13,6 +12,7 @@
             --bg: #f8fafc;
             --card: #ffffff;
             --text: #334155;
+            --error: #dc2626;
         }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -62,7 +62,7 @@
             margin-bottom: 16px;
         }
         
-        /* Confirmation Message Styles */
+        /* Confirmation Screen */
         #confirmationScreen { display: none; }
         .success-banner {
             background-color: #dcfce7;
@@ -84,12 +84,12 @@
         }
         .bank-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
 
-        /* Admin UI Panel */
+        /* Admin UI System */
         #adminSection { display: none; margin-top: 30px; }
         .toggle-admin-btn {
             background: #64748b;
             color: white;
-            padding: 10px 16px;
+            padding: 12px 18px;
             border: none;
             border-radius: 6px;
             font-size: 0.9rem;
@@ -103,6 +103,15 @@
             margin-bottom: 15px;
             border-radius: 0 8px 8px 0;
         }
+        .error-box {
+            background: #fee2e2;
+            color: var(--error);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: none;
+            font-weight: bold;
+        }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         th { background: #f1f5f9; }
@@ -112,17 +121,18 @@
 
 <div class="container">
 
-    <!-- SCREEN 1: THE SIGN-UP FORM -->
+    <div id="globalErrorBox" class="error-box"></div>
+
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
         <div class="debt-warning">
-            <strong>Notice:</strong> A <strong>R40 fee</strong> is owed immediately upon signing up. This debt is immediate, even if you cancel or fail to show up on Sunday.
+            <strong>Important Notice:</strong> A <strong>R40 transport contribution fee</strong> is owed immediately upon signing up. This debt is booked instantly, even if you cancel or do not show up on Sunday.
         </div>
         
         <form id="transportForm">
             <div class="form-group">
                 <label for="fullName">Full Name</label>
-                <input type="text" id="fullName" placeholder="e.g. Ayanda Dlamini" required>
+                <input type="text" id="fullName" placeholder="e.g. Sipho Zulu" required>
             </div>
 
             <div class="form-group">
@@ -131,9 +141,9 @@
             </div>
 
             <div class="form-group">
-                <label for="visitorStatus">Attendance Status</label>
+                <label for="visitorStatus">Attendance Classification</label>
                 <select id="visitorStatus" required>
-                    <option value="" disabled selected>-- Select Option --</option>
+                    <option value="" disabled selected>-- Select Status --</option>
                     <option value="Member">Member</option>
                     <option value="Visitor">Visitor</option>
                     <option value="First Time Visitor">First Time Visitor</option>
@@ -142,13 +152,13 @@
 
             <div class="form-group">
                 <label for="structure">Your Structure</label>
-                <input type="text" id="structure" placeholder="e.g. S1, S2, Zone B" required>
+                <input type="text" id="structure" placeholder="e.g. S1, S2, S3, etc." required>
             </div>
 
             <div class="form-group">
                 <label for="pickupLocation">Select Your Pickup Stop</label>
                 <select id="pickupLocation" required>
-                    <option value="" disabled selected>-- Select Location --</option>
+                    <option value="" disabled selected>-- Choose Stop --</option>
                     <option value="Argyle">Argyle</option>
                     <option value="Junction">Junction</option>
                     <option value="Arteria">Arteria</option>
@@ -162,58 +172,53 @@
         </form>
     </div>
 
-    <!-- SCREEN 2: SUCCESS MESSAGE & BANKING DETAILS -->
     <div id="confirmationScreen" class="card">
         <div class="success-banner">
-            🎉 SUCCESS! Your seat has been securely reserved on the Sunday manifest.
+            🎉 SEAT RESERVED SUCCESSFULLY!<br>
+            Your details have been locked into the Sunday driving manifest.
         </div>
         
-        <h3>Transport Contribution Details</h3>
-        <p>Please settle your R40 transport contribution via EFT/banking app before Sunday morning service.</p>
+        <h3>Digital Banking Contribution Info</h3>
+        <p>Please clear your R40 transport fee via EFT or your banking application before Sunday service setup.</p>
         
         <div class="bank-details">
             <div class="bank-row"><strong>Bank:</strong> <span>Capitec Bank</span></div>
-            <div class="bank-row"><strong>Account Name:</strong> <span>Church Transport</span></div>
+            <div class="bank-row"><strong>Account Name:</strong> <span>Church Transport Account</span></div>
             <div class="bank-row"><strong>Account Number:</strong> <span>1234567890</span></div>
             <div class="bank-row"><strong>Branch Code:</strong> <span>470010</span></div>
             <div class="bank-row"><strong>Amount Due:</strong> <strong>R40.00</strong></div>
-            <div class="bank-row" style="color: #c2410c;"><strong>Reference:</strong> <span id="paymentRef">Name</span></div>
+            <div class="bank-row" style="color: #c2410c;"><strong>EFT Reference:</strong> <span id="paymentRef">Name</span></div>
         </div>
-        <p style="font-size: 0.85rem; color: #64748b; text-align: center;">If paying cash, hand exact changes to your coordinator upon boarding.</p>
+        <p style="font-size: 0.85rem; color: #64748b; text-align: center;">If paying cash, please provide exact change to your vehicle coordinator upon boarding.</p>
         <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
     </div>
 
-    <!-- CONTROL PANEL SWITCH (For you to check data) -->
     <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
         <button class="toggle-admin-btn" onclick="toggleAdminView()">⚙️ Open Admin Control Dashboard</button>
     </div>
 
-    <!-- ADMIN PANEL VIEW -->
     <div id="adminSection">
-        <!-- Dashboard Block 1: Manifest compiler -->
         <div class="card">
-            <h2>🚖 Sunday Smart Taxi Manifests</h2>
-            <p>Vehicle Max Capacity: <strong>17 Seats</strong> (Sorted sequentially by route proximity)</p>
+            <h2>🚖 Sunday Compiled Taxi Rosters</h2>
+            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Optimized by proximity sequence: Argyle → Junction → Arteria → Education → EOH → Knockando)</p>
             <div id="manifestContainer"></div>
         </div>
 
-        <!-- Dashboard Block 2: Daily Checker Spreadsheet view -->
         <div class="card" style="max-width: 100%; overflow-x: auto;">
-            <h2>📊 All Active Raw Sign-Ups (Daily Tracker)</h2>
-            <p>Total Registrations: <strong id="totalCount">0</strong></p>
+            <h2>📊 Live Member Database (Daily Checker Tracker)</h2>
+            <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
             <table>
                 <thead>
                     <tr>
                         <th>Name</th>
                         <th>Phone</th>
-                        <th>Status</th>
+                        <th>Classification</th>
                         <th>Structure</th>
-                        <th>Stop</th>
+                        <th>Chosen Stop</th>
                     </tr>
                 </thead>
                 <tbody id="rawDataTableBody">
-                    <!-- Data entries go here -->
-                </tbody>
+                    </tbody>
             </table>
         </div>
     </div>
@@ -221,29 +226,36 @@
 </div>
 
 <script>
-    // ⚠️ PASTE YOUR TRUE SUPABASE DETAILS HERE WHEN LIVE
-    const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co/rest/v1/";
+    // FIXED: Extracted the base domain URL as required by the library architecture
+    const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
 
-    // Fallback variable to run perfectly offline/locally if keys are left blank
-    const isSupabaseConfigured = SUPABASE_URL.indexOf("your-project-id") === -1;
     let supabase = null;
-    if (isSupabaseConfigured) {
+    try {
         supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch(err) {
+        showError("Initialization Error: " + err.message);
     }
 
     const TAXI_CAPACITY = 17;
-    // Sequential route plan provided
+    // Stops sorted in sequential route order
     const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
-    // Handle form submissions
+    function showError(msg) {
+        const box = document.getElementById('globalErrorBox');
+        box.innerText = msg;
+        box.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Handle user inputs
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
-        btn.innerText = "Saving Seat...";
+        btn.innerText = "Processing Your Seat...";
         btn.disabled = true;
         
-        const formData = {
+        const dataPayload = {
             name: document.getElementById('fullName').value.trim(),
             phone: document.getElementById('phone').value.trim(),
             visitor_status: document.getElementById('visitorStatus').value,
@@ -251,130 +263,140 @@
             pickup_stop: document.getElementById('pickupLocation').value
         };
 
-        if (isSupabaseConfigured) {
-            // Send directly to the cloud
-            const { error } = await supabase.from('church_signups').insert([formData]);
+        try {
+            // Write directly to your real cloud system table
+            const { error } = await supabase.from('church_signups').insert([dataPayload]);
+            
             if (error) {
-                alert("Error sending to database: " + error.message);
+                showError("Database Rejection: " + error.message + " (Check if you executed Step 1 SQL script).");
                 btn.innerText = "Confirm My Seat & Agree to R40";
                 btn.disabled = false;
-                return;
+            } else {
+                // Generate Reference and swap to the Confirmation Screen
+                document.getElementById('paymentRef').innerText = `${dataPayload.name.replace(/\s+/g, '').toUpperCase()}SUN`;
+                document.getElementById('bookingScreen').style.display = 'none';
+                document.getElementById('confirmationScreen').style.display = 'block';
             }
-        } else {
-            // Local fallback simulation for testing in VS code instantly
-            let localList = JSON.parse(localStorage.getItem('mockData')) || [];
-            localList.push(formData);
-            localStorage.setItem('mockData', JSON.stringify(localList));
+        } catch(catchErr) {
+            showError("Network Connection Error: " + catchErr.message);
+            btn.innerText = "Confirm My Seat & Agree to R40";
+            btn.disabled = false;
         }
-
-        // Display Custom Payment Reference and switch screens smoothly
-        document.getElementById('paymentRef').innerText = `${formData.name.replace(/\s+/g, '')}SUN`;
-        document.getElementById('bookingScreen').style.display = 'none';
-        document.getElementById('confirmationScreen').style.display = 'block';
     });
 
-    // Fetch and compile system information
-    async function refreshDashboardData() {
-        let records = [];
+    // Gather data from the cloud database and process logistics
+    async function fetchAndCompileLogistics() {
+        try {
+            const { data: records, error } = await supabase
+                .from('church_signups')
+                .select('*')
+                .order('created_at', { ascending: true });
 
-        if (isSupabaseConfigured) {
-            const { data, error } = await supabase.from('church_signups').select('*').order('created_at', { ascending: false });
-            if (!error) records = data;
-        } else {
-            records = JSON.parse(localStorage.getItem('mockData')) || [];
-        }
+            if (error) {
+                showError("Failed to fetch records: " + error.message);
+                return;
+            }
 
-        // Render part 1: Daily Tracker Spreadsheet Table View
-        document.getElementById('totalCount').innerText = records.length;
-        const tbody = document.getElementById('rawDataTableBody');
-        tbody.innerHTML = '';
-        
-        if(records.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">No entries found.</td></tr>';
-        } else {
-            records.forEach(r => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${r.name}</strong></td>
-                    <td>${r.phone}</td>
-                    <td>${r.visitor_status}</td>
-                    <td>${r.structure}</td>
-                    <td><span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:bold;">${r.pickup_stop}</span></td>
-                `;
-                tbody.appendChild(tr);
+            // A. Update Spreadsheet Grid Display
+            document.getElementById('totalCount').innerText = records.length;
+            const tbody = document.getElementById('rawDataTableBody');
+            tbody.innerHTML = '';
+            
+            if(records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">No entries in database yet.</td></tr>';
+            } else {
+                records.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${r.name}</strong></td>
+                        <td>${r.phone}</td>
+                        <td>${r.visitor_status}</td>
+                        <td>${r.structure}</td>
+                        <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; font-weight:bold;">${r.pickup_stop}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // B. Run Optimization Algorithm into 17-Seat Taxis
+            const manifestContainer = document.getElementById('manifestContainer');
+            manifestContainer.innerHTML = '';
+
+            if(records.length === 0) {
+                manifestContainer.innerHTML = '<p style="color:#94a3b8;">No passengers registered to sort.</p>';
+                return;
+            }
+
+            // Bucket people by stops
+            let stopBuckets = {};
+            STOP_SEQUENCE.forEach(stop => stopBuckets[stop] = []);
+            records.forEach(p => {
+                if (stopBuckets[p.pickup_stop]) {
+                    stopBuckets[p.pickup_stop].push(`${p.name} (${p.structure})`);
+                }
             });
-        }
 
-        // Render part 2: Split passengers into 17-seater taxis logically by sequence
-        const manifestContainer = document.getElementById('manifestContainer');
-        manifestContainer.innerHTML = '';
+            let taxis = [];
+            let currentTaxi = { id: 1, passengers: [] };
 
-        let groups = {};
-        STOP_SEQUENCE.forEach(stop => groups[stop] = []);
-        records.forEach(p => {
-            if (groups[p.pickup_stop]) groups[p.pickup_stop].push(p.name);
-        });
+            // Sequential consolidation algorithm
+            STOP_SEQUENCE.forEach(stop => {
+                let individualsAtStop = stopBuckets[stop];
+                while(individualsAtStop.length > 0) {
+                    let availableSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    let boardingBatch = individualsAtStop.splice(0, availableSeats);
 
-        let taxis = [];
-        let currentTaxi = { id: 1, passengers: [] };
+                    boardingBatch.forEach(passenger => {
+                        currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                    });
 
-        STOP_SEQUENCE.forEach(stop => {
-            let namesAtStop = groups[stop];
-            while(namesAtStop.length > 0) {
-                let emptySeats = TAXI_CAPACITY - currentTaxi.passengers.length;
-                let boardingList = namesAtStop.splice(0, emptySeats);
+                    if(currentTaxi.passengers.length === TAXI_CAPACITY) {
+                        taxis.push(currentTaxi);
+                        currentTaxi = { id: taxis.length + 1, passengers: [] };
+                    }
+                }
+            });
 
-                boardingList.forEach(name => {
-                    currentTaxi.passengers.push({ name: name, stop: stop });
+            if(currentTaxi.passengers.length > 0) {
+                taxis.push(currentTaxi);
+            }
+
+            // Generate Manifest Render UI
+            taxis.forEach(taxi => {
+                const div = document.createElement('div');
+                div.className = 'taxi-card';
+                
+                let structureByStop = {};
+                taxi.passengers.forEach(p => {
+                    if(!structureByStop[p.stopName]) structureByStop[p.stopName] = [];
+                    structureByStop[p.stopName].push(p.passengerDetails);
                 });
 
-                if(currentTaxi.passengers.length === TAXI_CAPACITY) {
-                    taxis.push(currentTaxi);
-                    currentTaxi = { id: taxis.length + 1, passengers: [] };
+                let stopBreakdownHtml = '';
+                for(let sName in structureByStop) {
+                    stopBreakdownHtml += `<div style="margin-top:6px;"><strong>📍 Stop ${sName} (${structureByStop[sName].length} people):</strong> ${structureByStop[sName].join(', ')}</div>`;
                 }
-            }
-        });
 
-        if(currentTaxi.passengers.length > 0) {
-            taxis.push(currentTaxi);
-        }
-
-        if(records.length === 0) {
-            manifestContainer.innerHTML = '<p style="color:#94a3b8;">No manifests can be compiled yet.</p>';
-            return;
-        }
-
-        taxis.forEach(taxi => {
-            const div = document.createElement('div');
-            div.className = 'taxi-card';
-            
-            let summaryByStop = {};
-            taxi.passengers.forEach(p => {
-                if(!summaryByStop[p.stop]) summaryByStop[p.stop] = [];
-                summaryByStop[p.stop].push(p.name);
+                div.innerHTML = `
+                    <h3 style="color:#1e40af; margin:0 0 8px 0;">Taxi #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Seats Occupied)</h3>
+                    ${stopBreakdownHtml}
+                `;
+                manifestContainer.appendChild(div);
             });
 
-            let stopHtml = '';
-            for(let stopName in summaryByStop) {
-                stopHtml += `<div style="margin-bottom:8px;"><strong>📍 Stop ${stopName} (${summaryByStop[stopName].length} people):</strong> ${summaryByStop[stopName].join(', ')}</div>`;
-            }
-
-            div.innerHTML = `
-                <h3 style="color:#1e40af; margin-bottom:10px;">Taxi #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Filled)</h3>
-                ${stopHtml}
-            `;
-            manifestContainer.appendChild(div);
-        });
+        } catch(err) {
+            showError("System Error parsing manifests: " + err.message);
+        }
     }
 
-    // Toggle Visibility of the Admin Panel
+    // Toggle View Control Function
     function toggleAdminView() {
         const panel = document.getElementById('adminSection');
         if(panel.style.display === 'block') {
             panel.style.display = 'none';
         } else {
             panel.style.display = 'block';
-            refreshDashboardData();
+            fetchAndCompileLogistics();
         }
     }
 </script>
