@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
+    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
+    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -130,7 +132,9 @@
         <p style="margin-bottom: 20px;">Total Confirmed Sign-ups Across All Routes: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
         
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
-        <p style="font-size: 0.85rem; color:#64748b; margin-top:5px;">Passengers are cleanly separated below by vehicle using the "no-split stop" layout rule (17 seats limit).</p>
+        <!-- Added your Excel backup report tool directly here -->
+        <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
+        <p style="font-size: 0.85rem; color:#64748b; margin-top:5px;">Passengers are cleanly separated below by vehicle using the smart "no-split stop" layout rule (17 seats limit).</p>
         
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
@@ -206,95 +210,106 @@
                 let areaRecords = records.filter(r => stopList.includes(r.pickup_stop));
                 if (areaRecords.length === 0) continue; 
 
-                // Area Header Render Block
                 const areaHeaderDiv = document.createElement('div');
                 areaHeaderDiv.className = 'area-header';
                 areaHeaderDiv.innerText = `📍 ${areaName}`;
                 manifestContainer.appendChild(areaHeaderDiv);
 
-                // Group full record data objects by stop locations
                 let stopBuckets = {};
                 stopList.forEach(stop => stopBuckets[stop] = []);
                 areaRecords.forEach(p => {
                     if (stopBuckets[p.pickup_stop]) {
-                        stopBuckets[p.pickup_stop].push(p); // Saving full row object instead of a string
+                        stopBuckets[p.pickup_stop].push(p); 
                     }
                 });
 
                 let taxis = [];
-                let currentTaxi = { id: 1, passengers: [] };
 
-                // ATOMIC ROUTING COMPILER LOGIC (NO FRACTIONAL STOP SPLITTING)
+                // SMART FIRST-FIT WHOLE-GROUP COMPILER LOGIC
                 stopList.forEach(stop => {
                     let individualsAtStop = [...stopBuckets[stop]]; 
                     if (individualsAtStop.length === 0) return;
 
-                    let remainingSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    // Turnout Exception Handler: If an individual stop turnout exceeds 17 people entirely
+                    while (individualsAtStop.length >= TAXI_CAPACITY) {
+                        let fullTaxi = { id: taxis.length + 1, passengers: [] };
+                        let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
+                        fullTaxiBatch.forEach(recordObj => {
+                            fullTaxi.passengers.push(recordObj);
+                        });
+                        taxis.push(fullTaxi);
+                    }
 
-                    // Overflow Guard: Push the whole stop group to a clean vehicle if they exceed current vacancy
-                    if (individualsAtStop.length > remainingSeats) {
-                        if (currentTaxi.passengers.length > 0) {
-                            taxis.push(currentTaxi);
-                            currentTaxi = { id: taxis.length + 1, passengers: [] };
+                    // Process the remaining group cluster (guaranteed to be < 17 people)
+                    let remainingGroupSize = individualsAtStop.length;
+                    if (remainingGroupSize === 0) return;
+
+                    // Scan through all existing open taxis to see if the WHOLE group can fit into left vacancies
+                    let targetTaxi = null;
+                    for (let taxi of taxis) {
+                        let seatsLeft = TAXI_CAPACITY - taxi.passengers.length;
+                        if (seatsLeft >= remainingGroupSize) {
+                            targetTaxi = taxi;
+                            break; // Match found! Stop scanning
                         }
                     }
 
-                    // Turnout Exception Handler: If a single stop has > 17 people on its own
-                    while (individualsAtStop.length > TAXI_CAPACITY) {
-                        let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
-                        fullTaxiBatch.forEach(recordObj => {
-                            currentTaxi.passengers.push(recordObj);
-                        });
-                        taxis.push(currentTaxi);
-                        currentTaxi = { id: taxis.length + 1, passengers: [] };
-                    }
-
-                    // Safe Assignment: Put group cleanly into the current taxi vacancy
-                    if (individualsAtStop.length > 0) {
+                    if (targetTaxi) {
+                        // Put the entire group together inside the available open vehicle seats
                         individualsAtStop.forEach(recordObj => {
-                            currentTaxi.passengers.push(recordObj);
+                            targetTaxi.passengers.push(recordObj);
                         });
+                    } else {
+                        // If they don't fit into any existing vehicle cleanly, spin up a fresh one
+                        let newTaxi = { id: taxis.length + 1, passengers: [] };
+                        individualsAtStop.forEach(recordObj => {
+                            newTaxi.passengers.push(recordObj);
+                        });
+                        taxis.push(newTaxi);
                     }
                 });
 
-                if(currentTaxi.passengers.length > 0) {
-                    taxis.push(currentTaxi);
-                }
-
-                // RENDER VEHICLE BLOCKS WITH THEIR ASSOCIATED SPREADSHEET DATABASES
+                // RENDER VEHICLE CHECKLIST TABLES
                 taxis.forEach(taxi => {
                     const vehicleDiv = document.createElement('div');
                     vehicleDiv.className = 'vehicle-block';
 
-                    // Calculate internal stop metrics for driver summary text
+                    // Group entries for the text summary layout string calculation
                     let countsByStop = {};
                     taxi.passengers.forEach(p => {
                         countsByStop[p.pickup_stop] = (countsByStop[p.pickup_stop] || 0) + 1;
                     });
+                    
+                    // Loop strictly across stopList order to preserve chronological text summaries for drivers
                     let summaryStrings = [];
-                    for (let [sName, headcount] of Object.entries(countsByStop)) {
-                        summaryStrings.push(`${sName} (${headcount} people)`);
-                    }
+                    stopList.forEach(sName => {
+                        if (countsByStop[sName]) {
+                            summaryStrings.push(`${sName} (${countsByStop[sName]} people)`);
+                        }
+                    });
 
-                    // Generate spreadsheet rows specifically for this vehicle's passengers
+                    // Render rows sorted cleanly by geographical stop sequence order 
                     let tableRowsHtml = '';
-                    taxi.passengers.forEach(r => {
-                        tableRowsHtml += `
-                            <tr>
-                                <td><strong>${r.name}</strong></td>
-                                <td>${r.phone}</td>
-                                <td>${r.visitor_status}</td>
-                                <td>${r.structure}</td>
-                                <td><span style="background:#eff6ff; color:#1e40af; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
-                                <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
-                            </tr>
-                        `;
+                    stopList.forEach(sName => {
+                        let stopPassengers = taxi.passengers.filter(p => p.pickup_stop === sName);
+                        stopPassengers.forEach(r => {
+                            tableRowsHtml += `
+                                <tr>
+                                    <td><strong>${r.name}</strong></td>
+                                    <td>${r.phone}</td>
+                                    <td>${r.visitor_status}</td>
+                                    <td>${r.structure}</td>
+                                    <td><span style="background:#eff6ff; color:#1e40af; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
+                                    <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
+                                </tr>
+                            `;
+                        });
                     });
 
                     vehicleDiv.innerHTML = `
                         <div class="vehicle-title">🚍 Vehicle #${taxi.id} — Allocation: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled</div>
                         <div class="stop-summary-inline">
-                            <strong>Driver Route Summary:</strong> ${summaryStrings.join(' ➔ ')}
+                            <strong>Driver Route Plan:</strong> ${summaryStrings.join(' ➔ ')}
                         </div>
                         <div style="max-width: 100%; overflow-x: auto;">
                             <table>
@@ -321,6 +336,36 @@
         } catch(err) {
             alert("Exception parsing registers.");
             console.error(err);
+        }
+    }
+
+    async function downloadExcelBackup() {
+        try {
+            const { data: records, error } = await churchDb
+                .from('church_signups')
+                .select('name, phone, visitor_status, structure, pickup_stop, created_at')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                alert("Error pulling backup: " + error.message);
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
+            records.forEach(r => {
+                let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Church_Transport_Master_Archive_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err) {
+            alert("Failed to generate report: " + err.message);
         }
     }
 
