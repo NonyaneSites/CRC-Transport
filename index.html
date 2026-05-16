@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
-    <!-- Include Supabase Core Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -115,15 +114,6 @@
             margin-bottom: 15px;
             border-radius: 0 8px 8px 0;
         }
-        .error-box {
-            background: #fee2e2;
-            color: var(--error);
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            display: none;
-            font-weight: bold;
-        }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         th { background: #f1f5f9; }
@@ -143,13 +133,8 @@
 
 <div class="container">
 
-    <!-- ERROR MESSENGER HOLDER -->
-    <div id="globalErrorBox" class="error-box"></div>
-
-    <!-- SCREEN 1: THE SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
-        <!-- Requested upcoming Sunday Date Display -->
         <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading Date...</span></div>
         
         <div class="debt-warning">
@@ -199,7 +184,6 @@
         </form>
     </div>
 
-    <!-- SCREEN 2: THE VISUAL CONFIRMATION SCREEN -->
     <div id="confirmationScreen" class="card">
         <div class="success-banner">
             🎉 SEAT RESERVED SUCCESSFULLY!<br>
@@ -222,14 +206,11 @@
         <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
     </div>
 
-    <!-- SYSTEM CONTROL GATE -->
     <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
         <button class="toggle-admin-btn" onclick="toggleAdminView()">⚙️ Open Admin Control Dashboard</button>
     </div>
 
-    <!-- ADMIN ANALYSIS LAYOUT -->
     <div id="adminSection">
-        <!-- Live Taxis -->
         <div class="card">
             <h2>🚖 Sunday Compiled Taxi Rosters</h2>
             <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -237,7 +218,6 @@
             <div id="manifestContainer"></div>
         </div>
 
-        <!-- Raw List Spreadsheet Daily Tracker -->
         <div class="card" style="max-width: 100%; overflow-x: auto;">
             <h2>📊 Live Member Database (Daily Checker Tracker)</h2>
             <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
@@ -253,8 +233,7 @@
                     </tr>
                 </thead>
                 <tbody id="rawDataTableBody">
-                    <!-- Loaded dynamically via database calls -->
-                </tbody>
+                    </tbody>
             </table>
         </div>
     </div>
@@ -262,49 +241,42 @@
 </div>
 
 <script>
+    // System Configurations
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
-    
-    // SECURITY DEFINITION: Change this to your preferred admin password
-    const ADMIN_PASSWORD = "J3SUS4L1F3"; 
+    const ADMIN_PASSWORD = "Church2026"; 
+    const TAXI_CAPACITY = 17;
+    const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
     let supabase = null;
     try {
-        supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        if (!SUPABASE_URL || SUPABASE_URL.includes("your-project")) {
+            alert("Configuration Error: Please make sure the Supabase URL is correctly pasted.");
+        } else {
+            supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
     } catch(err) {
-        showError("Initialization Error: " + err.message);
+        alert("Supabase Initialization Failed: " + err.message);
     }
-
-    const TAXI_CAPACITY = 17;
-    const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
     // Automatic Upcoming Sunday Date Calculator
     function calculateUpcomingSunday() {
         let today = new Date();
-        let dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        let dayOfWeek = today.getDay(); 
         let daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
         
         let targetSunday = new Date(today);
         targetSunday.setDate(today.getDate() + daysUntilSunday);
         
-        // Format it neatly (e.g., Sunday, 17 May 2026)
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const formattedDate = targetSunday.toLocaleDateString('en-ZA', options);
         
-        // Write it to all elements carrying the date classes
         document.querySelectorAll('.targetSundayDate').forEach(el => {
             el.innerText = formattedDate;
         });
     }
 
-    function showError(msg) {
-        const box = document.getElementById('globalErrorBox');
-        box.innerText = msg;
-        box.style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    // Handle user inputs
+    // Handle form submissions
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
@@ -323,7 +295,7 @@
             const { error } = await supabase.from('church_signups').insert([dataPayload]);
             
             if (error) {
-                showError("Database Rejection: " + error.message);
+                alert("❌ DATABASE REJECTION:\n" + error.message + "\n\nTip: Make sure you successfully ran the SQL code in Step 1 inside your Supabase dashboard.");
                 btn.innerText = "Confirm My Seat & Agree to R40";
                 btn.disabled = false;
             } else {
@@ -332,7 +304,7 @@
                 document.getElementById('confirmationScreen').style.display = 'block';
             }
         } catch(catchErr) {
-            showError("Network Connection Error: " + catchErr.message);
+            alert("❌ NETWORK ERROR:\n" + catchErr.message);
             btn.innerText = "Confirm My Seat & Agree to R40";
             btn.disabled = false;
         }
@@ -347,7 +319,12 @@
                 .order('created_at', { ascending: true });
 
             if (error) {
-                showError("Failed to fetch records: " + error.message);
+                alert("❌ DATABASE ERROR FETCHING DATA:\n" + error.message);
+                return;
+            }
+
+            if (!records) {
+                alert("❌ No records returned from database.");
                 return;
             }
 
@@ -437,23 +414,26 @@
             });
 
         } catch(err) {
-            showError("System Error parsing manifests: " + err.message);
+            alert("❌ CRITICAL LAYOUT ERROR:\n" + err.message);
         }
     }
 
     // Live Cloud Deletion Function
     async function deletePassenger(id, name) {
         if (confirm(`Are you sure you want to completely remove ${name} from the transport list?`)) {
-            const { error } = await supabase
-                .from('church_signups')
-                .delete()
-                .eq('id', id);
+            try {
+                const { error } = await supabase
+                    .from('church_signups')
+                    .delete()
+                    .eq('id', id);
 
-            if (error) {
-                alert("Could not delete from database: " + error.message);
-            } else {
-                // Re-fetch and update lists instantly
-                fetchAndCompileLogistics();
+                if (error) {
+                    alert("Could not delete from database: " + error.message);
+                } else {
+                    fetchAndCompileLogistics();
+                }
+            } catch(err) {
+                alert("Deletion error: " + err.message);
             }
         }
     }
@@ -462,13 +442,11 @@
     function toggleAdminView() {
         const panel = document.getElementById('adminSection');
         
-        // If it's already open, let them close it without a password check
         if(panel.style.display === 'block') {
             panel.style.display = 'none';
             return;
         }
         
-        // Secure Gate: Prompt for the password before revealing
         let passwordAttempt = prompt("Enter Administrative Security Password:");
         
         if (passwordAttempt === ADMIN_PASSWORD) {
