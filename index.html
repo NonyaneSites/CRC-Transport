@@ -53,6 +53,17 @@
             cursor: pointer;
         }
         .btn:hover { background: #1d4ed8; }
+        .date-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1e40af;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            border: 1px solid #bfdbfe;
+        }
         .debt-warning {
             background-color: #fffbeb;
             border: 1px solid #fef08a;
@@ -116,6 +127,16 @@
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
         th { background: #f1f5f9; }
+        .delete-btn {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .delete-btn:hover { background: #fca5a5; }
     </style>
 </head>
 <body>
@@ -128,6 +149,9 @@
     <!-- SCREEN 1: THE SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
+        <!-- Requested upcoming Sunday Date Display -->
+        <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading Date...</span></div>
+        
         <div class="debt-warning">
             <strong>Important Notice:</strong> A <strong>R40 transport contribution fee</strong> is owed immediately upon signing up. This debt is booked instantly, even if you cancel or do not show up on Sunday.
         </div>
@@ -186,6 +210,7 @@
         <p>Please clear your R40 transport fee via EFT or your banking application before Sunday service setup.</p>
         
         <div class="bank-details">
+            <div class="bank-row"><strong>Booking Date:</strong> <span class="targetSundayDate" style="font-weight: bold;"></span></div>
             <div class="bank-row"><strong>Bank:</strong> <span>Capitec Bank</span></div>
             <div class="bank-row"><strong>Account Name:</strong> <span>Church Transport Account</span></div>
             <div class="bank-row"><strong>Account Number:</strong> <span>1234567890</span></div>
@@ -207,7 +232,8 @@
         <!-- Live Taxis -->
         <div class="card">
             <h2>🚖 Sunday Compiled Taxi Rosters</h2>
-            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Sorted sequentially by route proximity: Argyle → Junction → Arteria → Education → EOH → Knockando)</p>
+            <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
+            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Optimized by proximity sequence: Argyle → Junction → Arteria → Education → EOH → Knockando)</p>
             <div id="manifestContainer"></div>
         </div>
 
@@ -223,6 +249,7 @@
                         <th>Classification</th>
                         <th>Structure</th>
                         <th>Chosen Stop</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="rawDataTableBody">
@@ -237,17 +264,38 @@
 <script>
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
+    
+    // SECURITY DEFINITION: Change this to your preferred admin password
+    const ADMIN_PASSWORD = "Church2026"; 
 
-    let supabaseClient = null;
+    let supabase = null;
     try {
-        // FIXED: Using lowercase window.supabase instantiation to resolve CDN startup crash
-        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch(err) {
         showError("Initialization Error: " + err.message);
     }
 
     const TAXI_CAPACITY = 17;
     const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
+
+    // Automatic Upcoming Sunday Date Calculator
+    function calculateUpcomingSunday() {
+        let today = new Date();
+        let dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        let daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        
+        let targetSunday = new Date(today);
+        targetSunday.setDate(today.getDate() + daysUntilSunday);
+        
+        // Format it neatly (e.g., Sunday, 17 May 2026)
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const formattedDate = targetSunday.toLocaleDateString('en-ZA', options);
+        
+        // Write it to all elements carrying the date classes
+        document.querySelectorAll('.targetSundayDate').forEach(el => {
+            el.innerText = formattedDate;
+        });
+    }
 
     function showError(msg) {
         const box = document.getElementById('globalErrorBox');
@@ -256,6 +304,7 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // Handle user inputs
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
@@ -271,10 +320,10 @@
         };
 
         try {
-            const { error } = await supabaseClient.from('church_signups').insert([dataPayload]);
+            const { error } = await supabase.from('church_signups').insert([dataPayload]);
             
             if (error) {
-                showError("Database Rejection: " + error.message + " (Double check if you completed Step 2).");
+                showError("Database Rejection: " + error.message);
                 btn.innerText = "Confirm My Seat & Agree to R40";
                 btn.disabled = false;
             } else {
@@ -289,9 +338,10 @@
         }
     });
 
+    // Gather data from database and process logistics
     async function fetchAndCompileLogistics() {
         try {
-            const { data: records, error } = await supabaseClient
+            const { data: records, error } = await supabase
                 .from('church_signups')
                 .select('*')
                 .order('created_at', { ascending: true });
@@ -301,12 +351,13 @@
                 return;
             }
 
+            // A. Update Spreadsheet Grid Display
             document.getElementById('totalCount').innerText = records.length;
             const tbody = document.getElementById('rawDataTableBody');
             tbody.innerHTML = '';
             
             if(records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">No entries in database yet.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">No entries in database yet.</td></tr>';
             } else {
                 records.forEach(r => {
                     const tr = document.createElement('tr');
@@ -316,11 +367,13 @@
                         <td>${r.visitor_status}</td>
                         <td>${r.structure}</td>
                         <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; font-weight:bold;">${r.pickup_stop}</span></td>
+                        <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Delete</button></td>
                     `;
                     tbody.appendChild(tr);
                 });
             }
 
+            // B. Run Optimization Algorithm into 17-Seat Taxis
             const manifestContainer = document.getElementById('manifestContainer');
             manifestContainer.innerHTML = '';
 
@@ -388,15 +441,46 @@
         }
     }
 
-    function toggleAdminView() {
-        const panel = document.getElementById('adminSection');
-        if(panel.style.display === 'block') {
-            panel.style.display = 'none';
-        } else {
-            panel.style.display = 'block';
-            fetchAndCompileLogistics();
+    // Live Cloud Deletion Function
+    async function deletePassenger(id, name) {
+        if (confirm(`Are you sure you want to completely remove ${name} from the transport list?`)) {
+            const { error } = await supabase
+                .from('church_signups')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                alert("Could not delete from database: " + error.message);
+            } else {
+                // Re-fetch and update lists instantly
+                fetchAndCompileLogistics();
+            }
         }
     }
+
+    // Toggle View Control Function with Password Security Gate
+    function toggleAdminView() {
+        const panel = document.getElementById('adminSection');
+        
+        // If it's already open, let them close it without a password check
+        if(panel.style.display === 'block') {
+            panel.style.display = 'none';
+            return;
+        }
+        
+        // Secure Gate: Prompt for the password before revealing
+        let passwordAttempt = prompt("Enter Administrative Security Password:");
+        
+        if (passwordAttempt === ADMIN_PASSWORD) {
+            panel.style.display = 'block';
+            fetchAndCompileLogistics();
+        } else if (passwordAttempt !== null) {
+            alert("❌ Incorrect Password. Access Denied.");
+        }
+    }
+
+    // Run date calculator automatically on bootup
+    calculateUpcomingSunday();
 </script>
 </body>
 </html>
