@@ -191,12 +191,12 @@
 
     const churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // COMPACT MAP ALIGNED TO THE MASTER OPTIMAL PATTERNS
+    // FIXED STRINGS MATRIX ALIGNED TO STABLE HISTORICAL VALUES
     const STOPS_DATA = {
-        "CBD": ["Ghandi", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
-        "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
-        "Braam": ["Braam", "56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"],
-        "Auckland Park": ["UJ bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonalds"]
+        "CBD": ["Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
+        "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
+        "Braam": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"],
+        "Auckland Park": ["UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"]
     };
 
     function updateStopsDropdown() {
