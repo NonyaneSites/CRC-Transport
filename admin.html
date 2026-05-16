@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
+    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
+    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -59,21 +61,60 @@
         .area-header {
             background: #1e3a8a;
             color: white;
-            padding: 10px 18px;
+            padding: 12px 20px;
             border-radius: 8px;
             margin-top: 35px;
             margin-bottom: 15px;
             font-size: 1.3rem;
             font-weight: bold;
         }
+        
+        /* NOTES APP ACCORDION INTERACTIVE STYLES */
         .vehicle-block {
             background: var(--card);
             border: 1px solid #cbd5e1;
-            border-left: 6px solid var(--success);
-            padding: 20px;
-            margin-bottom: 25px;
-            border-radius: 4px 12px 12px 4px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
+        .vehicle-header-trigger {
+            background: #f8fafc;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+            border-left: 6px solid var(--success);
+        }
+        .vehicle-header-trigger:hover {
+            background: #f1f5f9;
+        }
+        .vehicle-title {
+            color: #065f46;
+            font-weight: bold;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toggle-status-badge {
+            font-size: 0.85rem;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .vehicle-collapsible-content {
+            display: none; /* Collapsed/hidden by default like Notes app */
+            padding: 20px;
+            border-top: 1px solid #cbd5e1;
+            background: var(--card);
+        }
+        
         .limbo-block {
             background: var(--limbo-bg);
             border: 2px dashed var(--limbo-border);
@@ -83,21 +124,14 @@
             margin-bottom: 30px;
             color: var(--limbo-text);
         }
-        .vehicle-title {
-            color: #065f46;
-            margin-bottom: 12px;
-            font-size: 1.2rem;
-            border-bottom: 2px dashed #cbd5e1;
-            padding-bottom: 6px;
-            font-weight: bold;
-        }
         .stop-summary-inline {
             background: #f1f5f9;
-            padding: 10px;
+            padding: 12px;
             border-radius: 6px;
             font-size: 0.9rem;
             margin-bottom: 15px;
             color: #475569;
+            line-height: 1.4;
         }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; color: #334155; }
@@ -127,11 +161,13 @@
 
 <div class="container">
 
+    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
+    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -143,6 +179,7 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
+    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
 </div>
@@ -188,6 +225,24 @@
         });
     }
 
+    // Interactive accordion toggle function
+    function toggleTaxiView(globalId) {
+        const targetContentBlock = document.getElementById(`taxi-content-${globalId}`);
+        const targetBadge = document.getElementById(`taxi-badge-${globalId}`);
+        
+        if (targetContentBlock.style.display === "block") {
+            targetContentBlock.style.display = "none";
+            targetBadge.innerText = "▼ Show List";
+            targetBadge.style.background = "#e2e8f0";
+            targetBadge.style.color = "#475569";
+        } else {
+            targetContentBlock.style.display = "block";
+            targetBadge.innerText = "▲ Hide List";
+            targetBadge.style.background = "#dcfce7";
+            targetBadge.style.color = "#15803d";
+        }
+    }
+
     async function fetchAndCompileLogistics() {
         try {
             const { data: records, error } = await churchDb
@@ -216,6 +271,9 @@
             }
 
             let globalLimboPassengers = [];
+            
+            // GLOBAL SEQUENTIAL COUNTER ENFORCED HERE
+            let globalTaxiCounter = 1; 
 
             // COMPILE INDEPENDENT ROUTE AREAS
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
@@ -236,7 +294,7 @@
                     if (individualsAtStop.length === 0) return;
 
                     while (individualsAtStop.length >= TAXI_CAPACITY) {
-                        let fullTaxi = { id: areaTaxis.length + 1, passengers: [] };
+                        let fullTaxi = { id: null, passengers: [] }; // global ID mapping occurs later
                         let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
                         fullTaxiBatch.forEach(p => fullTaxi.passengers.push(p));
                         areaTaxis.push(fullTaxi);
@@ -274,7 +332,7 @@
                     }
 
                     if (testTaxiContent.length >= MIN_PASSENGER_FLOOR) {
-                        let newTaxi = { id: areaTaxis.length + 1, passengers: testTaxiContent };
+                        let newTaxi = { id: null, passengers: testTaxiContent };
                         areaTaxis.push(newTaxi);
                         backlogStops = backlogStops.filter((_, idx) => !elementsToExtract.includes(idx));
                     } else {
@@ -285,7 +343,7 @@
                     }
                 }
 
-                // RENDER ACTIVE TAXI VEHICLES WITH CHRONOLOGICAL REROUTING LAYOUTS
+                // RENDER ACTIVE TAXI VEHICLES
                 if (areaTaxis.length > 0) {
                     const areaHeaderDiv = document.createElement('div');
                     areaHeaderDiv.className = 'area-header';
@@ -293,8 +351,11 @@
                     manifestContainer.appendChild(areaHeaderDiv);
 
                     areaTaxis.forEach(taxi => {
-                        const vehicleDiv = document.createElement('div');
-                        vehicleDiv.className = 'vehicle-block';
+                        // ASSIGN GLOBAL SEQUENTIAL COUNTER ID
+                        let runningGlobalId = globalTaxiCounter++; 
+                        
+                        const vehicleBlockElement = document.createElement('div');
+                        vehicleBlockElement.className = 'vehicle-block';
 
                         let countsByStop = {};
                         taxi.passengers.forEach(p => {
@@ -306,9 +367,8 @@
                             if (countsByStop[sName]) routePlanStrings.push(`${sName} (${countsByStop[sName]} people)`);
                         });
 
-                        // MODIFICATION: Re-ordered Columns inside Table Rows HTML Generation Loop
                         let tableRowsHtml = '';
-                        let passengerIndexCounter = 1; // Counter initialized per taxi vehicle
+                        let passengerIndexCounter = 1; 
 
                         stopList.forEach(sName => {
                             let stopPassengers = taxi.passengers.filter(p => p.pickup_stop === sName);
@@ -327,40 +387,46 @@
                             });
                         });
 
-                        vehicleDiv.innerHTML = `
-                            <div class="vehicle-title">🚍 Vehicle #${taxi.id} — Total Loading: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled</div>
-                            <div class="stop-summary-inline">
-                                <strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}
+                        // NOTES APP TOGGLE LAYOUT ENGINE DOM MARKUP
+                        vehicleBlockElement.innerHTML = `
+                            <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
+                                <div class="vehicle-title">🚍 Taxi #${runningGlobalId} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— Allocated: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled</span></div>
+                                <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
                             </div>
-                            <div style="max-width: 100%; overflow-x: auto;">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 40px;">#</th>
-                                            <th>Stop Location</th>
-                                            <th>Passenger Name</th>
-                                            <th>Phone</th>
-                                            <th>Classification</th>
-                                            <th>Structure</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${tableRowsHtml}</tbody>
-                                </table>
+                            <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
+                                <div class="stop-summary-inline">
+                                    <strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}
+                                </div>
+                                <div style="max-width: 100%; overflow-x: auto;">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 40px;">#</th>
+                                                <th>Stop Location</th>
+                                                <th>Passenger Name</th>
+                                                <th>Phone</th>
+                                                <th>Classification</th>
+                                                <th>Structure</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${tableRowsHtml}</tbody>
+                                    </table>
+                                </div>
                             </div>
                         `;
-                        manifestContainer.appendChild(vehicleDiv);
+                        manifestContainer.appendChild(vehicleBlockElement);
                     });
                 }
             }
 
-            // PHASE 4: RENDER THE SECURED LIMBO BLOCK AT THE BOTTOM OF THE LAYOUT WINDOW
+            // PHASE 4: RENDER THE SECURED LIMBO BLOCK AT THE BOTTOM
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
                 
                 let limboRowsHtml = '';
-                let limboIndexCounter = 1; // Counter initialized for the Limbo system list
+                let limboIndexCounter = 1; 
 
                 globalLimboPassengers.forEach(r => {
                     limboRowsHtml += `
@@ -438,21 +504,16 @@
     }
 
     async function deletePassenger(id, name) {
-        let securityChallenge = prompt(`🔒 Security Clearance Required:\nEnter Admin Password to completely remove ${name} from the database:`);
-        
+        let securityChallenge = prompt("🔒 Security Clearance Required:\nEnter Admin Password to complete removal:");
         if (securityChallenge === null) return; 
-        
         if (securityChallenge === ADMIN_PASSWORD) {
-            if (confirm(`Are you absolutely sure you want to permanently delete ${name}? This action cannot be undone.`)) {
+            if (confirm(`Are you sure you want to delete ${name}?`)) {
                 const { error } = await churchDb.from('church_signups').delete().eq('id', id);
-                if (error) {
-                    alert("Deletion rejected by database: " + error.message);
-                } else {
-                    fetchAndCompileLogistics(); 
-                }
+                if (error) alert("Deletion error: " + error.message);
+                else fetchAndCompileLogistics(); 
             }
         } else {
-            alert("❌ Access Denied: Incorrect Administrative Password.");
+            alert("❌ Incorrect Password.");
         }
     }
 
