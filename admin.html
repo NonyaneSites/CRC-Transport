@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
+    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -20,7 +21,6 @@
             color: var(--text);
             margin: 0;
             padding: 15px;
-            display: none; /* Hidden until password verification passes */
         }
         .container { max-width: 750px; margin: 0 auto; }
         .card {
@@ -86,11 +86,13 @@
 
 <div class="container">
 
+    <!-- Database Monitor Sync Verification -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
+    <!-- Taxi Manifest List Cards -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -99,6 +101,7 @@
         <div id="manifestContainer"></div>
     </div>
 
+    <!-- Active Grid Data Spreadsheet Tracker Layout -->
     <div class="card" style="max-width: 100%; overflow-x: auto;">
         <h2>📊 Live Passenger Database (Daily Checker Tracker)</h2>
         <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
@@ -122,23 +125,13 @@
 <script>
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
-    const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
     let churchDb = null;
     const diagnostic = document.getElementById('diagnosticStatus');
 
-    // Prompt gate on immediate page access
-    const authAttempt = prompt("Enter Administrative Security Password to Access Console:");
-    if (authAttempt === ADMIN_PASSWORD) {
-        document.body.style.display = "block";
-        initializeAdmin();
-    } else {
-        alert("❌ Access Denied.");
-        window.location.href = "index.html"; // Boot intruders back to the form
-    }
-
+    // Page initializes automatically on load without password intervention
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -273,6 +266,9 @@
             else fetchAndCompileLogistics();
         }
     }
+
+    // Execute app load instantly on runtime
+    initializeAdmin();
 </script>
 </body>
 </html>
