@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -40,8 +39,7 @@
             box-sizing: border-box;
             font-size: 1rem;
         }
-        optgroup { font-weight: bold; color: var(--primary); background: #f1f5f9; }
-        option { color: var(--text); background: var(--card); }
+        select:disabled { background-color: #e2e8f0; cursor: not-allowed; }
         .btn {
             width: 100%;
             padding: 14px;
@@ -100,7 +98,6 @@
 
 <div class="container">
 
-    <!-- SCREEN 1: SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
         <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading...</span></div>
@@ -136,54 +133,20 @@
             </div>
 
             <div class="form-group">
-                <label for="pickupLocation">Select Your Pickup Area & Stop</label>
-                <select id="pickupLocation" required>
-                    <option value="" disabled selected>-- Choose Area & Stop Location --</option>
-                    
-                    <optgroup label="Braam Stops">
-                        <option value="56 Jorissen">56 Jorissen</option>
-                        <option value="Amani">Amani</option>
-                        <option value="Amic Deck">Amic Deck</option>
-                        <option value="Apex">Apex</option>
-                        <option value="Student Digzz">Student Digzz</option>
-                        <option value="YMCA">YMCA</option>
-                    </optgroup>
+                <label for="pickupArea">Select Transport Area</label>
+                <select id="pickupArea" required onchange="updateStopsDropdown()">
+                    <option value="" disabled selected>-- Choose Area --</option>
+                    <option value="Braam">Braam</option>
+                    <option value="Auckland Park">Auckland Park</option>
+                    <option value="CBD">CBD</option>
+                    <option value="Parktown">Parktown</option>
+                </select>
+            </div>
 
-                    <optgroup label="Auckland Park Stops">
-                        <option value="APK McDonald’s">APK McDonald’s</option>
-                        <option value="Gate 2">Gate 2</option>
-                        <option value="Gate 4">Gate 4</option>
-                        <option value="Laborie">Laborie</option>
-                        <option value="Richmond">Richmond</option>
-                        <option value="UJ Bunting">UJ Bunting</option>
-                        <option value="Westdene Engen">Westdene Engen</option>
-                    </optgroup>
-
-                    <optgroup label="CBD Stops">
-                        <option value="DFC Bus Stop">DFC Bus Stop</option>
-                        <option value="Focus 1">Focus 1</option>
-                        <option value="Focus 2">Focus 2</option>
-                        <option value="Gateway">Gateway</option>
-                        <option value="Ghandi Square">Ghandi Square</option>
-                        <option value="Maboneng">Maboneng</option>
-                        <option value="Saratoga">Saratoga</option>
-                        <option value="Shell Mooi Street">Shell Mooi Street</option>
-                        <option value="The Fields">The Fields</option>
-                        <option value="Urban Circle">Urban Circle</option>
-                    </optgroup>
-
-                    <optgroup label="Parktown Stops">
-                        <option value="Argyle">Argyle</option>
-                        <option value="Arteria">Arteria</option>
-                        <option value="Campus Central on Empire">Campus Central on Empire</option>
-                        <option value="Charlotte Maxeke">Charlotte Maxeke</option>
-                        <option value="Education Campus">Education Campus</option>
-                        <option value="EOH">EOH</option>
-                        <option value="Junction">Junction</option>
-                        <option value="Knockando">Knockando</option>
-                        <option value="Stanley Avenue">Stanley Avenue</option>
-                        <option value="Yale">Yale</option>
-                    </optgroup>
+            <div class="form-group">
+                <label for="pickupLocation">Select Your Specific Stop</label>
+                <select id="pickupLocation" required disabled>
+                    <option value="" disabled selected>-- Choose Area First --</option>
                 </select>
             </div>
 
@@ -191,7 +154,6 @@
         </form>
     </div>
 
-    <!-- SCREEN 2: VISUAL CONFIRMATION SCREEN -->
     <div id="confirmationScreen" class="card">
         <div class="success-banner">
             🎉 SEAT RESERVED SUCCESSFULLY!<br>
@@ -221,6 +183,46 @@
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
 
     const churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Chained Stop Data Matrix mapping landmarks to areas
+    const STOPS_DATA = {
+        "Braam": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA"],
+        "Auckland Park": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
+        "CBD": ["DFC Bus Stop", "Focus 2", "Gateway", "Ghandi Square", "Maboneng", "Saratoga", "Shell Mooi Street", "Urban Circle", "The Fields", "Focus 1"],
+        "Parktown": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
+    };
+
+    // Dependent dropdown updater engine
+    function updateStopsDropdown() {
+        const areaSelect = document.getElementById('pickupArea');
+        const stopSelect = document.getElementById('pickupLocation');
+        const chosenArea = areaSelect.value;
+
+        stopSelect.innerHTML = ''; 
+
+        if (chosenArea && STOPS_DATA[chosenArea]) {
+            stopSelect.disabled = false;
+            
+            // Add initial default option
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = "";
+            defaultOpt.disabled = true;
+            defaultOpt.selected = true;
+            defaultOpt.innerText = "-- Choose Specific Location --";
+            stopSelect.appendChild(defaultOpt);
+
+            // Populate specific local stops
+            STOPS_DATA[chosenArea].forEach(stop => {
+                const opt = document.createElement('option');
+                opt.value = stop;
+                opt.innerText = stop;
+                stopSelect.appendChild(opt);
+            });
+        } else {
+            stopSelect.disabled = true;
+            stopSelect.innerHTML = '<option value="" disabled selected>-- Choose Area First --</option>';
+        }
+    }
 
     function calculateUpcomingSunday() {
         let today = new Date();
