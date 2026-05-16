@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
         :root {
             --primary: #1e40af;
@@ -29,6 +29,20 @@
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
             margin-bottom: 20px;
         }
+        
+        /* DIAGNOSTIC PANEL STYLES */
+        .diagnostic-box {
+            background-color: #f1f5f9;
+            border: 2px dashed #94a3b8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .status-good { color: var(--success); font-weight: bold; }
+        .status-bad { color: var(--error); font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 6px; border: 1px solid #fca5a5; }
+
         h2, h3 { margin-top: 0; color: #0f172a; }
         .form-group { margin-bottom: 16px; }
         label { display: block; margin-bottom: 6px; font-weight: 600; color: #475569; }
@@ -73,7 +87,6 @@
             margin-bottom: 16px;
         }
         
-        /* Confirmation Screen */
         #confirmationScreen { display: none; }
         .success-banner {
             background-color: #dcfce7;
@@ -95,7 +108,6 @@
         }
         .bank-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
 
-        /* Admin UI System */
         #adminSection { display: none; margin-top: 30px; }
         .toggle-admin-btn {
             background: #64748b;
@@ -126,16 +138,36 @@
             cursor: pointer;
             font-weight: bold;
         }
-        .delete-btn:hover { background: #fca5a5; }
     </style>
+
+    <!-- Global Crash Interceptor script to catch errors immediately -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const out = document.getElementById('diagnosticStatus');
+            if(out) {
+                out.className = "status-bad";
+                out.innerHTML = "🚨 SYSTEM CRASH DETECTED:<br>Error: " + message + "<br>Line: " + lineno;
+            }
+            return false;
+        };
+    </script>
+    <!-- Include Supabase Core Cloud Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
 <div class="container">
 
+    <!-- THE LIVE DIAGNOSTIC MONITOR -->
+    <div class="diagnostic-box">
+        <strong>⚙️ System Live Diagnostic Monitor:</strong>
+        <div id="diagnosticStatus" class="status-good">Checking database connectivity...</div>
+    </div>
+
+    <!-- SCREEN 1: THE SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
-        <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading Date...</span></div>
+        <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading...</span></div>
         
         <div class="debt-warning">
             <strong>Important Notice:</strong> A <strong>R40 transport contribution fee</strong> is owed immediately upon signing up. This debt is booked instantly, even if you cancel or do not show up on Sunday.
@@ -184,6 +216,7 @@
         </form>
     </div>
 
+    <!-- SCREEN 2: THE VISUAL CONFIRMATION SCREEN -->
     <div id="confirmationScreen" class="card">
         <div class="success-banner">
             🎉 SEAT RESERVED SUCCESSFULLY!<br>
@@ -206,15 +239,17 @@
         <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
     </div>
 
+    <!-- SYSTEM CONTROL GATE -->
     <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
-        <button class="toggle-admin-btn" onclick="toggleAdminView()">⚙️ Open Admin Control Dashboard</button>
+        <button class="toggle-admin-btn" id="adminGateBtn">⚙️ Open Admin Control Dashboard</button>
     </div>
 
+    <!-- ADMIN ANALYSIS LAYOUT -->
     <div id="adminSection">
         <div class="card">
             <h2>🚖 Sunday Compiled Taxi Rosters</h2>
             <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Optimized by proximity sequence: Argyle → Junction → Arteria → Education → EOH → Knockando)</p>
+            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Optimized by proximity sequence)</p>
             <div id="manifestContainer"></div>
         </div>
 
@@ -232,8 +267,7 @@
                         <th>Action</th>
                     </tr>
                 </thead>
-                <tbody id="rawDataTableBody">
-                    </tbody>
+                <tbody id="rawDataTableBody"></tbody>
             </table>
         </div>
     </div>
@@ -241,7 +275,6 @@
 </div>
 
 <script>
-    // System Configurations
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const ADMIN_PASSWORD = "Church2026"; 
@@ -249,17 +282,40 @@
     const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
     let supabase = null;
+    const diagnostic = document.getElementById('diagnosticStatus');
+
+    // 1. Core Startup Verification
     try {
-        if (!SUPABASE_URL || SUPABASE_URL.includes("your-project")) {
-            alert("Configuration Error: Please make sure the Supabase URL is correctly pasted.");
+        if (typeof Supabase === 'undefined') {
+            diagnostic.className = "status-bad";
+            diagnostic.innerHTML = "🚨 STARTUP ERROR: The Supabase library script is blocked by an ad-blocker, Brave shield, or firewall rule.";
         } else {
             supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            diagnostic.innerHTML = "✅ Database Driver Loaded. Checking Cloud Sync...";
+            verifyCloudConnection();
         }
     } catch(err) {
-        alert("Supabase Initialization Failed: " + err.message);
+        diagnostic.className = "status-bad";
+        diagnostic.innerHTML = "🚨 STARTUP EXCEPTION: " + err.message;
     }
 
-    // Automatic Upcoming Sunday Date Calculator
+    async function verifyCloudConnection() {
+        try {
+            const { data, error } = await supabase.from('church_signups').select('id').limit(1);
+            if(error) {
+                diagnostic.className = "status-bad";
+                diagnostic.innerHTML = "🚨 CLOUD SYNC FAILED:<br>" + error.message + "<br><br>👉 This means your Supabase Table hasn't been set up yet. Go back to Step 1 in your previous message and run the SQL code inside your Supabase dashboard SQL editor.";
+            } else {
+                diagnostic.className = "status-good";
+                diagnostic.innerHTML = "🟢 System fully operational and connected to Supabase Cloud!";
+            }
+        } catch(e) {
+            diagnostic.className = "status-bad";
+            diagnostic.innerHTML = "🚨 CLOUD CONNECTIVITY ERROR: " + e.message;
+        }
+    }
+
+    // 2. Automated Upcoming Sunday Date Calculator
     function calculateUpcomingSunday() {
         let today = new Date();
         let dayOfWeek = today.getDay(); 
@@ -276,7 +332,7 @@
         });
     }
 
-    // Handle form submissions
+    // 3. Form Submission Handling
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
@@ -295,7 +351,7 @@
             const { error } = await supabase.from('church_signups').insert([dataPayload]);
             
             if (error) {
-                alert("❌ DATABASE REJECTION:\n" + error.message + "\n\nTip: Make sure you successfully ran the SQL code in Step 1 inside your Supabase dashboard.");
+                alert("❌ DATABASE REJECTION:\n" + error.message);
                 btn.innerText = "Confirm My Seat & Agree to R40";
                 btn.disabled = false;
             } else {
@@ -304,13 +360,13 @@
                 document.getElementById('confirmationScreen').style.display = 'block';
             }
         } catch(catchErr) {
-            alert("❌ NETWORK ERROR:\n" + catchErr.message);
+            alert("❌ NETWORKING EXCEPTION:\n" + catchErr.message);
             btn.innerText = "Confirm My Seat & Agree to R40";
             btn.disabled = false;
         }
     });
 
-    // Gather data from database and process logistics
+    // 4. Admin Management Dashboard Engine
     async function fetchAndCompileLogistics() {
         try {
             const { data: records, error } = await supabase
@@ -319,16 +375,10 @@
                 .order('created_at', { ascending: true });
 
             if (error) {
-                alert("❌ DATABASE ERROR FETCHING DATA:\n" + error.message);
+                alert("❌ ERROR GATHERING RECORDS:\n" + error.message);
                 return;
             }
 
-            if (!records) {
-                alert("❌ No records returned from database.");
-                return;
-            }
-
-            // A. Update Spreadsheet Grid Display
             document.getElementById('totalCount').innerText = records.length;
             const tbody = document.getElementById('rawDataTableBody');
             tbody.innerHTML = '';
@@ -350,7 +400,6 @@
                 });
             }
 
-            // B. Run Optimization Algorithm into 17-Seat Taxis
             const manifestContainer = document.getElementById('manifestContainer');
             manifestContainer.innerHTML = '';
 
@@ -414,50 +463,39 @@
             });
 
         } catch(err) {
-            alert("❌ CRITICAL LAYOUT ERROR:\n" + err.message);
+            alert("❌ PARSING ERROR:\n" + err.message);
         }
     }
 
-    // Live Cloud Deletion Function
     async function deletePassenger(id, name) {
         if (confirm(`Are you sure you want to completely remove ${name} from the transport list?`)) {
             try {
-                const { error } = await supabase
-                    .from('church_signups')
-                    .delete()
-                    .eq('id', id);
-
-                if (error) {
-                    alert("Could not delete from database: " + error.message);
-                } else {
-                    fetchAndCompileLogistics();
-                }
+                const { error } = await supabase.from('church_signups').delete().eq('id', id);
+                if (error) alert("Could not delete from database: " + error.message);
+                else fetchAndCompileLogistics();
             } catch(err) {
                 alert("Deletion error: " + err.message);
             }
         }
     }
 
-    // Toggle View Control Function with Password Security Gate
-    function toggleAdminView() {
+    // Direct Event Binding to avoid parsing lockouts
+    document.getElementById('adminGateBtn').addEventListener('click', function() {
         const panel = document.getElementById('adminSection');
-        
         if(panel.style.display === 'block') {
             panel.style.display = 'none';
             return;
         }
         
         let passwordAttempt = prompt("Enter Administrative Security Password:");
-        
         if (passwordAttempt === ADMIN_PASSWORD) {
             panel.style.display = 'block';
             fetchAndCompileLogistics();
         } else if (passwordAttempt !== null) {
             alert("❌ Incorrect Password. Access Denied.");
         }
-    }
+    });
 
-    // Run date calculator automatically on bootup
     calculateUpcomingSunday();
 </script>
 </body>
