@@ -181,7 +181,7 @@
             font-size: 1rem;
         }
 
-        /* CUSTOM MODAL BACKDROP CSS OVERLAYS */
+        /* CUSTOM MODAL BACKDROP OVERLAYS */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -262,22 +262,22 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // THE 27-STEP SYSTEM ROUTE SEQN ARRAYS (INCORPORATING CONDITIONALS FOR EDUCATION + ARTERIA SWAP)
+    // FULL COMPREHENSIVE PATH ARRAY INTEGRATING EXACT HARMONIZED TEXT UPDATES
     const MASTER_ROUTE_SEQUENCE = [
-        "Ghandi", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
-        "Campus Central on Empire", "Argyle", "Junction", "Education", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
-        "Braam", "Yale", "Stanley Avenue", "UJ bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonalds"
+        "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
+        "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
+        "Braam", "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
     ];
 
-    // RAW SELECTION OVERRIDES FOR INLINE NORMALIZATION MAPPINGS
+    // DEFINITIONS APPLIED FOR BRAAM OVERRIDE CONSOLIDATION
     const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
-    // AREA CLASSIFICATION MATRIX FOR MAJORITY TITLE CHECKS
+    // AREA INDEX DICTIONARY FOR THE SYSTEM ROUTE ALLOCATOR TITLE CHECKS
     const AREA_MAPPING = {
-        "Ghandi": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
-        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
+        "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route",
-        "UJ bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonalds": "Auckland Park Route"
+        "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
     };
 
     let churchDb = null;
@@ -377,19 +377,37 @@
                 return;
             }
 
-            // NORMALIZATION PIPELINE RUNTIME EXECUTION
+            // ROBUST DATA NORMALIZATION NORMALIZATION PIPELINE WITH CASE SANITIZING SAFEGUARDS
             let workingPool = records.map(r => {
-                let displayStop = r.pickup_stop;
-                if (EXCLUSIVE_BRAAM_STOPS.includes(r.pickup_stop)) {
+                let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
+                
+                // Historical string compatibility corrections to clear database data legacy drops
+                if (dbStopRaw.toLowerCase() === "ghandi" || dbStopRaw.toLowerCase() === "ghandi square") dbStopRaw = "Ghandi Square";
+                if (dbStopRaw.toLowerCase() === "education" || dbStopRaw.toLowerCase() === "education campus") dbStopRaw = "Education Campus";
+                if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
+                if (dbStopRaw.toLowerCase() === "uj bunting") dbStopRaw = "UJ Bunting";
+
+                let displayStop = dbStopRaw;
+                if (EXCLUSIVE_BRAAM_STOPS.some(s => s.toLowerCase() === dbStopRaw.toLowerCase())) {
                     displayStop = "Braam";
                 }
-                let mappedArea = AREA_MAPPING[displayStop] || "Unknown Route";
+
+                // Match up route area parameters safely based on the sequence index configurations
+                let mappedArea = "Unknown Route";
+                for (let [stopKey, areaValue] of Object.entries(AREA_MAPPING)) {
+                    if (stopKey.toLowerCase() === displayStop.toLowerCase()) {
+                        displayStop = stopKey; 
+                        mappedArea = areaValue;
+                        break;
+                    }
+                }
+
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACT WHOLE BLOCKS >= 17 FOR INDIVIDUAL STOPS
+            // PASS 1: IMMEDIATE ISOLATION OF STOPS GREATER THAN OR EQUAL TO 17
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -399,7 +417,7 @@
                 }
             });
 
-            // PASS 2: COMBINATORIAL KNAPSACK SUBSET FILLER (packs localized exact 17 fits seamlessly)
+            // PASS 2: REGIONAL KNAPSACK MATCH ENGINE (collects exact local 17 combinations)
             let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
             uniqueAreas.forEach(areaName => {
                 let perfectMatchFound = true;
@@ -424,7 +442,7 @@
                 }
             });
 
-            // PASS 3: GLOBAL ORDERED SELECTION COMPILER
+            // PASS 3: PRIORITY-CHECK KNAPSACK SEQUENTIAL LOADER FOR UNDER-CAPACITY STOPS
             let globalLeftoverStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
@@ -469,7 +487,7 @@
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
 
-            // PHASE 4: OUTPUT LAYOUT BLOCKS BUILDER
+            // PHASE 4: ACCORDION INTERFACE DESIGN STRUCTURING OUTPUT RENDER
             let globalTaxiCounter = 1;
 
             finalizedTaxis.forEach(taxi => {
@@ -477,7 +495,6 @@
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
-                // MAJORITY CALCULATION RULE FOR TITLE MANIFEST ALLOCATIONS
                 let areaTallyMap = {};
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
@@ -534,7 +551,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: RENDER COLLAPSIBLE LIMBO ACCORDION
+            // PHASE 5: OUTPUT COLLAPSIBLE UNASSIGNED LIMBO FIELD
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
