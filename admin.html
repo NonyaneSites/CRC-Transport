@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
-    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -69,7 +67,7 @@
             font-weight: bold;
         }
         
-        /* NOTES APP ACCORDION INTERACTIVE STYLES */
+        /* NOTES APP ACCORDION STYLES */
         .vehicle-block {
             background: var(--card);
             border: 1px solid #cbd5e1;
@@ -89,9 +87,7 @@
             transition: background 0.2s;
             border-left: 6px solid var(--success);
         }
-        .vehicle-header-trigger:hover {
-            background: #f1f5f9;
-        }
+        .vehicle-header-trigger:hover { background: #f1f5f9; }
         .vehicle-title {
             color: #065f46;
             font-weight: bold;
@@ -109,21 +105,45 @@
             font-weight: bold;
         }
         .vehicle-collapsible-content {
-            display: none; /* Collapsed/hidden by default like Notes app */
+            display: none; /* Hidden by default */
             padding: 20px;
             border-top: 1px solid #cbd5e1;
             background: var(--card);
         }
         
+        /* NOTES APP DROPROW STYLE FOR LIMBO */
         .limbo-block {
             background: var(--limbo-bg);
-            border: 2px dashed var(--limbo-border);
-            padding: 24px;
-            border-radius: 12px;
+            border: 1px solid var(--limbo-border);
             margin-top: 35px;
             margin-bottom: 30px;
-            color: var(--limbo-text);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
+        .limbo-header-trigger {
+            background: #ffe4e6;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            border-left: 6px solid var(--error);
+        }
+        .limbo-header-trigger:hover { background: #fecdd3; }
+        .limbo-title {
+            color: var(--limbo-text);
+            font-weight: bold;
+            font-size: 1.15rem;
+        }
+        .limbo-collapsible-content {
+            display: none; /* Hidden by default */
+            padding: 20px;
+            border-top: 1px solid var(--limbo-border);
+            background: #fff1f2;
+        }
+
         .stop-summary-inline {
             background: #f1f5f9;
             padding: 12px;
@@ -161,13 +181,11 @@
 
 <div class="container">
 
-    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
-    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -179,7 +197,6 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
-    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
 </div>
@@ -225,7 +242,7 @@
         });
     }
 
-    // Interactive accordion toggle function
+    // Interactive accordion toggle function for Taxis
     function toggleTaxiView(globalId) {
         const targetContentBlock = document.getElementById(`taxi-content-${globalId}`);
         const targetBadge = document.getElementById(`taxi-badge-${globalId}`);
@@ -240,6 +257,24 @@
             targetBadge.innerText = "▲ Hide List";
             targetBadge.style.background = "#dcfce7";
             targetBadge.style.color = "#15803d";
+        }
+    }
+
+    // Interactive accordion toggle function for Limbo
+    function toggleLimboView() {
+        const targetContentBlock = document.getElementById('limbo-content-block');
+        const targetBadge = document.getElementById('limbo-toggle-badge');
+        
+        if (targetContentBlock.style.display === "block") {
+            targetContentBlock.style.display = "none";
+            targetBadge.innerText = "▼ Show List";
+            targetBadge.style.background = "#e2e8f0";
+            targetBadge.style.color = "#475569";
+        } else {
+            targetContentBlock.style.display = "block";
+            targetBadge.innerText = "▲ Hide List";
+            targetBadge.style.background = "#ffe4e6";
+            targetBadge.style.color = "#9f1239";
         }
     }
 
@@ -271,9 +306,7 @@
             }
 
             let globalLimboPassengers = [];
-            
-            // GLOBAL SEQUENTIAL COUNTER ENFORCED HERE
-            let globalTaxiCounter = 1; 
+            let globalTaxiCounter = 1; // Sequential across all areas
 
             // COMPILE INDEPENDENT ROUTE AREAS
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
@@ -289,12 +322,14 @@
                 let areaTaxis = [];
                 let backlogStops = [];
 
+                // RE-ENGINEERED COMPILER PASS
                 stopList.forEach(stop => {
                     let individualsAtStop = [...stopBuckets[stop]];
                     if (individualsAtStop.length === 0) return;
 
+                    // Handle turnouts > 17 immediately
                     while (individualsAtStop.length >= TAXI_CAPACITY) {
-                        let fullTaxi = { id: null, passengers: [] }; // global ID mapping occurs later
+                        let fullTaxi = { id: null, passengers: [] }; 
                         let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
                         fullTaxiBatch.forEach(p => fullTaxi.passengers.push(p));
                         areaTaxis.push(fullTaxi);
@@ -303,6 +338,7 @@
                     let remainingGroupSize = individualsAtStop.length;
                     if (remainingGroupSize === 0) return;
 
+                    // Check if this entire stop fits into any previously created taxis
                     let targetTaxi = null;
                     for (let taxi of areaTaxis) {
                         let seatsLeft = TAXI_CAPACITY - taxi.passengers.length;
@@ -315,14 +351,17 @@
                     if (targetTaxi) {
                         individualsAtStop.forEach(p => targetTaxi.passengers.push(p));
                     } else {
+                        // Keep the group unified in the optimization backlog
                         backlogStops.push(individualsAtStop);
                     }
                 });
 
+                // RE-ENGINEERED MULTI-PASS OPTIMIZATION PASSTHROUGH
                 while (backlogStops.length > 0) {
                     let testTaxiContent = [];
                     let elementsToExtract = [];
 
+                    // Combine stops from the backlog array to build a vehicle
                     for (let i = 0; i < backlogStops.length; i++) {
                         let currentGroup = backlogStops[i];
                         if (testTaxiContent.length + currentGroup.length <= TAXI_CAPACITY) {
@@ -331,11 +370,13 @@
                         }
                     }
 
+                    // Enforce the utilization floor requirement
                     if (testTaxiContent.length >= MIN_PASSENGER_FLOOR) {
                         let newTaxi = { id: null, passengers: testTaxiContent };
                         areaTaxis.push(newTaxi);
                         backlogStops = backlogStops.filter((_, idx) => !elementsToExtract.includes(idx));
                     } else {
+                        // If remaining groups cannot meet the utilization floor, send them to the Limbo array
                         backlogStops.forEach(group => {
                             globalLimboPassengers.push(...group);
                         });
@@ -343,7 +384,7 @@
                     }
                 }
 
-                // RENDER ACTIVE TAXI VEHICLES
+                // RENDER VEHICLES
                 if (areaTaxis.length > 0) {
                     const areaHeaderDiv = document.createElement('div');
                     areaHeaderDiv.className = 'area-header';
@@ -351,7 +392,6 @@
                     manifestContainer.appendChild(areaHeaderDiv);
 
                     areaTaxis.forEach(taxi => {
-                        // ASSIGN GLOBAL SEQUENTIAL COUNTER ID
                         let runningGlobalId = globalTaxiCounter++; 
                         
                         const vehicleBlockElement = document.createElement('div');
@@ -387,7 +427,6 @@
                             });
                         });
 
-                        // NOTES APP TOGGLE LAYOUT ENGINE DOM MARKUP
                         vehicleBlockElement.innerHTML = `
                             <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
                                 <div class="vehicle-title">🚍 Taxi #${runningGlobalId} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— Allocated: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled</span></div>
@@ -420,7 +459,7 @@
                 }
             }
 
-            // PHASE 4: RENDER THE SECURED LIMBO BLOCK AT THE BOTTOM
+            // RE-ENGINEERED COLLAPSIBLE DROP ROW FOR LIMBO PASSENGER ROSTER
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -443,25 +482,30 @@
                 });
 
                 limboDiv.innerHTML = `
-                    <h3 style="color:#9f1239; margin-bottom: 5px;">⚠️ Unassigned Passengers (${globalLimboPassengers.length} in Limbo)</h3>
-                    <p style="font-size:0.85rem; margin-top:0; color:#475569;">
-                        These stops are currently unassigned because their headcount cannot fit into open capacity slots, and their standalone numbers fall below the efficiency threshold required to operate an exclusive taxi route.
-                    </p>
-                    <div style="max-width: 100%; overflow-x: auto; background: white; border-radius:12px; border:1px solid #fecdd3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width: 40px;">#</th>
-                                    <th>Stop Location</th>
-                                    <th>Name</th>
-                                    <th>Phone</th>
-                                    <th>Classification</th>
-                                    <th>Structure</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>${limboRowsHtml}</tbody>
-                        </table>
+                    <div class="limbo-header-trigger" onclick="toggleLimboView()">
+                        <div class="limbo-title">⚠️ Unassigned Passengers <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— ${globalLimboPassengers.length} in Limbo</span></div>
+                        <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
+                    </div>
+                    <div class="limbo-collapsible-content" id="limbo-content-block">
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">
+                            These stops are currently unassigned because their headcount cannot fit into open capacity slots, and their standalone numbers fall below the efficiency threshold required to operate an exclusive taxi route.
+                        </p>
+                        <div style="max-width: 100%; overflow-x: auto; background: white; border-radius:8px; border:1px solid #fecdd3;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;">#</th>
+                                        <th>Stop Location</th>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Classification</th>
+                                        <th>Structure</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${limboRowsHtml}</tbody>
+                            </table>
+                        </div>
                     </div>
                 `;
                 limboSectionContainer.appendChild(limboDiv);
