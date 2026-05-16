@@ -216,12 +216,16 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
+    // DEFINING MASTER ROUTE CONFIGURATION SCHEMA (BRAAM ROUTE USES EXCLUSIVE NORMALIZED OVERRIDE MATCH)
     const REGIONAL_ROUTES = {
-        "Braam Route": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA"],
+        "Braam Route": ["Braam"],
         "Auckland Park Route": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
         "CBD Route": ["DFC Bus Stop", "Focus 2", "Gateway", "Ghandi Square", "Maboneng", "Saratoga", "Shell Mooi Street", "Urban Circle", "The Fields", "Focus 1"],
         "Parktown Route": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
     };
+
+    // EXCLUSIVE DIRECT ISOLATION KEY FOR THE SPECIFIED BRAAM BUS STOPS
+    const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
     let churchDb = null;
     const diagnostic = document.getElementById('diagnosticStatus');
@@ -284,7 +288,6 @@
         }
     }
 
-    // Helper combinatorial algorithm to scan for an exact capacity sum match within an area
     function findPerfectAreaSubset(stopGroups, targetCapacity) {
         for (let i = 1; i < (1 << stopGroups.length); i++) {
             let sum = 0;
@@ -327,21 +330,28 @@
                 return;
             }
 
-            // Decorate base objects with routing profiles
+            // DATA PRE-PROCESSING: REMAP EXCLUSIVE BRAAM LOCATIONS IMMEDIATELY
             let workingPool = records.map(r => {
                 let areaName = "Unknown Route";
-                for (let [aKey, sList] of Object.entries(REGIONAL_ROUTES)) {
-                    if (sList.includes(r.pickup_stop)) { areaName = aKey; break; }
+                let displayStop = r.pickup_stop;
+                
+                if (EXCLUSIVE_BRAAM_STOPS.includes(r.pickup_stop)) {
+                    areaName = "Braam Route";
+                    displayStop = "Braam"; // Normalized override
+                } else {
+                    for (let [aKey, sList] of Object.entries(REGIONAL_ROUTES)) {
+                        if (sList.includes(r.pickup_stop)) { areaName = aKey; break; }
+                    }
                 }
-                return { ...r, assigned: false, sourceArea: areaName };
+                return { ...r, assigned: false, sourceArea: areaName, displayStop: displayStop };
             });
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACT PURE NATIVE MULTIPLES (Turnouts of single stops >= 17)
+            // PASS 1: EXTRACTION OF NATIVE MULTIPLES >= 17 (INCLUDING CONSOLIDATED BRAAM)
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 stopList.forEach(sName => {
-                    let matchingRiders = workingPool.filter(p => !p.assigned && p.pickup_stop === sName);
+                    let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                     while (matchingRiders.length >= TAXI_CAPACITY) {
                         let fullBatch = matchingRiders.splice(0, TAXI_CAPACITY);
                         fullBatch.forEach(p => p.assigned = true);
@@ -350,16 +360,15 @@
                 });
             }
 
-            // PASS 2: COMBINATORIAL NATIVE PASS (Find combinations within the same area matching exactly 17)
+            // PASS 2: COMBINATORIAL NATIVE MATCH ENGINE (packs full 17s internally per area)
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 let perfectMatchFound = true;
-                
                 while (perfectMatchFound) {
                     let remainingUnassignedAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
                     
                     let activeAreaStops = [];
                     stopList.forEach(sName => {
-                        let stopRiders = remainingUnassignedAreaRiders.filter(p => p.pickup_stop === sName);
+                        let stopRiders = remainingUnassignedAreaRiders.filter(p => p.displayStop === sName);
                         if (stopRiders.length > 0) {
                             activeAreaStops.push({ stopName: sName, passengers: stopRiders });
                         }
@@ -376,17 +385,16 @@
                         });
                         finalizedTaxis.push({ passengers: taxiContent });
                     } else {
-                        perfectMatchFound = false; // Break out when no more clean 17 combinations exist
+                        perfectMatchFound = false; 
                     }
                 }
             }
 
-            // PASS 3: GLOBAL CROSS-AREA CONSOLIDATION LOOP (Packs remaining components sequentially)
+            // PASS 3: GLOBAL SEQUENTIAL COMPONENT CONSOLIDATION LOOP
             let globalLeftoverStops = [];
-            // Track all remaining unassigned passenger records grouped by stop sequentially across our system configuration
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 stopList.forEach(sName => {
-                    let unassignedRiders = workingPool.filter(p => !p.assigned && p.pickup_stop === sName);
+                    let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                     if (unassignedRiders.length > 0) {
                         globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
                     }
@@ -397,10 +405,8 @@
 
             globalLeftoverStops.forEach(group => {
                 let ridersToPlace = [...group.passengers];
-                
                 while (ridersToPlace.length > 0) {
                     let availableSeats = TAXI_CAPACITY - currentConsolidatedTaxi.passengers.length;
-                    
                     if (ridersToPlace.length <= availableSeats) {
                         currentConsolidatedTaxi.passengers.push(...ridersToPlace);
                         ridersToPlace = [];
@@ -413,21 +419,18 @@
                 }
             });
 
-            // Handle the final leftover accumulation block
             if (currentConsolidatedTaxi.passengers.length > 0) {
                 if (currentConsolidatedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     finalizedTaxis.push(currentConsolidatedTaxi);
                 } else {
-                    // Fail floor limit bounds -> Route to Limbo
                     currentConsolidatedTaxi.passengers.forEach(p => p.assigned = false);
                 }
             }
 
-            // Re-sync final assignment flags to catch global unassigned items
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
 
-            // PHASE 4: RENDER FLAT NOTES-STYLE LIST (No high-level static area blocks)
+            // PHASE 4: RE-ENGINEERED INTERACTIVE RENDER SCHEDULER (No high-level static area containers)
             let globalTaxiCounter = 1;
 
             finalizedTaxis.forEach(taxi => {
@@ -435,26 +438,24 @@
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
-                // Determine route classification metadata parameters dynamically
-                let uniqueAreasInTaxi = [...new Set(taxi.passengers.map(p => p.sourceArea))];
-                let dynamicRouteHeaderTitle = "";
-                
-                if (uniqueAreasInTaxi.length === 1) {
-                    dynamicRouteHeaderTitle = `${uniqueAreasInTaxi[0]} Manifest`;
-                } else {
-                    dynamicRouteHeaderTitle = "Mixed Route Manifest";
-                }
+                // ALGORITHM MODIFICATION: MAJORITY AREA RUNTIME ALLOCATION
+                let areaTallyMap = {};
+                taxi.passengers.forEach(p => {
+                    areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1;
+                });
+                // Sort to find the dominant geographical area
+                let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
+                let dynamicRouteHeaderTitle = `${majorityArea} Manifest`;
 
-                // Compute layout summary details
+                // Calculate plan descriptors
                 let countSummaryMap = {};
-                taxi.passengers.forEach(p => { countSummaryMap[p.pickup_stop] = (countSummaryMap[p.pickup_stop] || 0) + 1; });
+                taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
                 let routePlanStrings = [];
-                // Print route planning text dynamically preserving chronological order arrays
                 for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                     stopList.forEach(sName => {
                         if (countSummaryMap[sName]) {
-                            routePlanStrings.push(`${sName} (${countSummaryMap[sName]} people)`);
+                            routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
                         }
                     });
                 }
@@ -462,20 +463,20 @@
                 let tableRowsHtml = '';
                 let passengerIndexCounter = 1;
 
-                // Render table rows grouped sequentially by internal configuration parameters
+                // Sort and print table items chronologically based on route configurations
                 for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                     stopList.forEach(sName => {
-                        let stopPassengers = taxi.passengers.filter(p => p.pickup_stop === sName);
+                        let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
                         stopPassengers.forEach(r => {
-                            // Check if person is a cross-route rider relative to the overall dominant taxi category
-                            let isCrossAreaRider = uniqueAreasInTaxi.length > 1;
-                            let crossAreaBadgeMarkup = isCrossAreaRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
-                            let crossRowStyle = isCrossAreaRider ? `style="background-color: #fffbeb;"` : '';
+                            // MINORITY EXTRACTION HIGHLIGHTING CRITERIA
+                            let isMinorityRider = r.sourceArea !== majorityArea;
+                            let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
+                            let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
 
                             tableRowsHtml += `
                                 <tr ${crossRowStyle}>
                                     <td><strong>${passengerIndexCounter++}.</strong></td>
-                                    <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
+                                    <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
                                     <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
                                     <td>${r.phone}</td>
                                     <td>${r.visitor_status}</td>
@@ -529,7 +530,7 @@
                     limboRowsHtml += `
                         <tr style="background: #fff1f2;">
                             <td style="color:#9f1239;"><strong>${limboIndexCounter++}.</strong></td>
-                            <td><span style="background:#ffe4e6; color:#9f1239; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
+                            <td><span style="background:#ffe4e6; color:#9f1239; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
                             <td style="color:#9f1239;"><strong>${r.name}</strong> <span style="font-weight:normal; font-size:0.8rem; color:#64748b;">(${r.sourceArea.split(' ')[0]})</span></td>
                             <td style="color:#9f1239;">${r.phone}</td>
                             <td style="color:#9f1239;">${r.visitor_status}</td>
