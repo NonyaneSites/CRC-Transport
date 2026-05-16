@@ -262,7 +262,7 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // MASTER CHRONOLOGICAL SEQUENCE PATHWAY ARRANGEMENT
+    // MASTER CHRONOLOGICAL PATH SEQUENCE
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
@@ -338,7 +338,6 @@
         }
     }
 
-    // Mathematical subset summation solver to locate perfect capacity fits internally per route region
     function findPerfectSubset(stopGroups, targetCapacity) {
         for (let i = 1; i < (1 << stopGroups.length); i++) {
             let sum = 0;
@@ -363,7 +362,7 @@
                 return;
             }
 
-            // PASS 0: AUTOMATIC REAL-TIME DEDUPLICATION FILTER (Filters by lowercase trimmed fullName)
+            // PASS 0: AUTOMATIC REAL-TIME CASE-INSENSITIVE DEDUPLICATION
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -386,7 +385,7 @@
                 return;
             }
 
-            // STRING HARMONIZATION PIPELINE
+            // DATA NORMALIZATION & STRING HARMONIZATION PIPELINE
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
@@ -413,7 +412,7 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: ISOLATE SINGLE CHECKPOINTS EXCEEDING CAPACITY LIMITS (>=17)
+            // PASS 1: EXRACT STOPS EXCEEDING VEHICLE CAPACITY LIMITS (>=17)
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -423,7 +422,7 @@
                 }
             });
 
-            // PASS 2: INTRA-AREA COHESION MATCHING (Locates groups inside one area that fit perfectly into a 17-seater)
+            // PASS 2: INTRA-AREA COHESION MATCHING (Finds exact 17-seat group fits internally inside areas)
             let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
             uniqueAreas.forEach(areaName => {
                 let perfectMatchFound = true;
@@ -448,7 +447,7 @@
                 }
             });
 
-            // PASS 3: STANDALONE AREA SURVIVAL CHECK (If remaining area passengers totals 14-17, keep them together)
+            // PASS 3: STANDALONE REGIONAL SURVIVAL CHECK (If remaining area riders total 14-17, keep them purely together)
             uniqueAreas.forEach(areaName => {
                 let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
                 if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
@@ -457,62 +456,100 @@
                 }
             });
 
-            // PASS 4: GEOGRAPHICALLY CHRONOLOGICAL CROSS-POOL FILLER FOR REMAINING BACKLOGS
+            // PASS 4: ADVANCED LEFTOVER MATCHING PACKER ENGINE (Enforces priority rules on open vehicles)
             let globalLeftoverStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-                if (unassignedRiders.length > 0) globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
+                if (unassignedRiders.length > 0) {
+                    globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
+                }
             });
 
             while (globalLeftoverStops.length > 0) {
-                let currentTaxi = { passengers: [] };
-                let seedGroup = globalLeftoverStops.shift();
-                currentTaxi.passengers.push(...seedGroup.passengers);
+                let currentStopGroup = globalLeftoverStops[0];
+                let targetStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(currentStopGroup.stopName);
+                
+                // Track vehicles currently sitting below full 17 capacity limits
+                let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
 
-                while (currentTaxi.passengers.length < TAXI_CAPACITY && globalLeftoverStops.length > 0) {
-                    let openSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    let matchIndex = globalLeftoverStops.findIndex(g => g.passengers.length === openSeats);
-
-                    if (matchIndex === -1) {
-                        let validWholeFits = globalLeftoverStops.map((g, idx) => ({ g, idx })).filter(item => item.g.passengers.length <= openSeats);
-                        if (validWholeFits.length > 0) {
-                            validWholeFits.sort((a, b) => b.g.passengers.length - a.g.passengers.length);
-                            matchIndex = validWholeFits[0].idx;
-                        }
-                    }
-
-                    if (matchIndex === -1) {
-                        let nextGroup = globalLeftoverStops[0];
-                        let sliceBatch = nextGroup.passengers.splice(0, openSeats);
-                        currentTaxi.passengers.push(...sliceBatch);
-                        if (nextGroup.passengers.length === 0) globalLeftoverStops.shift();
-                    } else {
-                        let matchedGroup = globalLeftoverStops.splice(matchIndex, 1)[0];
-                        currentTaxi.passengers.push(...matchedGroup.passengers);
-                    }
-                }
-
-                if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    finalizedTaxis.push(currentTaxi);
+                if (openCandidateTaxis.length === 0) {
+                    // No partially full vehicles exist, open a new vehicle container
+                    let newTaxi = { passengers: [] };
+                    let sliceBatch = currentStopGroup.passengers.splice(0, TAXI_CAPACITY);
+                    sliceBatch.forEach(p => p.assigned = true);
+                    newTaxi.passengers.push(...sliceBatch);
+                    finalizedTaxis.push(newTaxi);
+                    
+                    if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
                 } else {
-                    currentTaxi.passengers.forEach(p => p.assigned = false);
+                    // Apply priority hierarchy criteria to select the best vehicle target
+                    openCandidateTaxis.forEach(taxi => {
+                        let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
+                        
+                        // Rule Part A: Count unique stops currently in the vehicle's run
+                        taxi._stopsCount = uniqueStopsInTaxi.size;
+                        
+                        // Rule Part B: Locate index position of the vehicle's last stop assignment
+                        let maxSequenceIndex = -1;
+                        uniqueStopsInTaxi.forEach(st => {
+                            let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
+                            if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
+                        });
+                        
+                        // Calculate absolute geographic sequence step distance
+                        taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
+                    });
+
+                    // Sort candidate vehicles based on your precise ranking specifications
+                    openCandidateTaxis.sort((a, b) => {
+                        if (a._stopsCount !== b._stopsCount) {
+                            return a._stopsCount - b._stopsCount; // Least amount of unique stops first
+                        }
+                        return a._distanceToTarget - b._distanceToTarget; // Closest index distance layout next
+                    });
+
+                    // Pack the highest ranking target vehicle
+                    let optimalTaxiTarget = openCandidateTaxis[0];
+                    let remainingSeats = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
+                    let sliceBatch = currentStopGroup.passengers.splice(0, remainingSeats);
+                    sliceBatch.forEach(p => p.assigned = true);
+                    optimalTaxiTarget.passengers.push(...sliceBatch);
+
+                    if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
                 }
             }
 
-            finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
-            let globalLimboPassengers = workingPool.filter(p => !p.assigned);
+            // Post-processing cleanup pass: Ensure ALL finalized vehicles meet the minimum safety floor bounds
+            finalizedTaxis = finalizedTaxis.filter(taxi => {
+                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    return true;
+                } else {
+                    // Release passengers back to unassigned status so they populate Limbo automatically
+                    taxi.passengers.forEach(p => p.assigned = false);
+                    return false;
+                }
+            });
 
-            // PHASE 5: INTERFACE ACCORDION MANIFEST RENDERER
+            let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
+            // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
+                // Core Area Calculation
                 let areaTallyMap = {};
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
+
+                // DYNAMIC HEADERS DESIGN PIPELINE
+                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
+                let cleanAreaLabelName = majorityArea.replace(" Route", "");
+                let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
+                    ? `${cleanAreaLabelName} (Mixed) Manifest` 
+                    : `${majorityArea} Manifest`;
 
                 let countSummaryMap = {};
                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
@@ -548,7 +585,7 @@
 
                 vehicleBlockElement.innerHTML = `
                     <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
-                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${majorityArea} Manifest <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
+                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
                     </div>
                     <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
@@ -566,7 +603,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 6: LIMBO FIELD DISPLAY
+            // PHASE 6: UNASSIGNED LIMBO ACCORDION GENERATION
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
