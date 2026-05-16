@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
-    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -79,8 +77,9 @@
         .limbo-block {
             background: var(--limbo-bg);
             border: 2px dashed var(--limbo-border);
-            padding: 20px;
+            padding: 24px;
             border-radius: 12px;
+            margin-top: 35px;
             margin-bottom: 30px;
             color: var(--limbo-text);
         }
@@ -133,9 +132,6 @@
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
-    <!-- THE REQUESTED LIMBO SECTION OUTLET -->
-    <div id="limboSectionContainer"></div>
-
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -147,11 +143,14 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
+    <div id="limboSectionContainer"></div>
+
 </div>
 
 <script>
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
+    const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
@@ -223,7 +222,6 @@
                 let areaRecords = records.filter(r => stopList.includes(r.pickup_stop));
                 if (areaRecords.length === 0) continue; 
 
-                // Isolate records by stop lists
                 let stopBuckets = {};
                 stopList.forEach(stop => stopBuckets[stop] = []);
                 areaRecords.forEach(p => {
@@ -233,12 +231,10 @@
                 let areaTaxis = [];
                 let backlogStops = [];
 
-                // PHASE 1: FILL EXTANT CAPACITY FIRST (FIRST-FIT WHOLE-GROUP APPROACH)
                 stopList.forEach(stop => {
                     let individualsAtStop = [...stopBuckets[stop]];
                     if (individualsAtStop.length === 0) return;
 
-                    // Turnout Exception: If one stop has >17 people on its own, fill whole vehicles
                     while (individualsAtStop.length >= TAXI_CAPACITY) {
                         let fullTaxi = { id: areaTaxis.length + 1, passengers: [] };
                         let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
@@ -249,7 +245,6 @@
                     let remainingGroupSize = individualsAtStop.length;
                     if (remainingGroupSize === 0) return;
 
-                    // Scan open vehicles to check if this whole group can fit into existing open seats
                     let targetTaxi = null;
                     for (let taxi of areaTaxis) {
                         let seatsLeft = TAXI_CAPACITY - taxi.passengers.length;
@@ -262,17 +257,14 @@
                     if (targetTaxi) {
                         individualsAtStop.forEach(p => targetTaxi.passengers.push(p));
                     } else {
-                        // Hold group in backlog if it doesn't fit in open slots
                         backlogStops.push(individualsAtStop);
                     }
                 });
 
-                // PHASE 2: PROCESSING BACKLOG GROUPS WITH LIMBO CAPACITY CHECK
                 while (backlogStops.length > 0) {
                     let testTaxiContent = [];
                     let elementsToExtract = [];
 
-                    // Try combining remaining backlog items to reach the utilization floor of 14
                     for (let i = 0; i < backlogStops.length; i++) {
                         let currentGroup = backlogStops[i];
                         if (testTaxiContent.length + currentGroup.length <= TAXI_CAPACITY) {
@@ -281,16 +273,11 @@
                         }
                     }
 
-                    // Enforce the passenger floor requirement
                     if (testTaxiContent.length >= MIN_PASSENGER_FLOOR) {
-                        // Create a valid vehicle if the utilization floor is met
                         let newTaxi = { id: areaTaxis.length + 1, passengers: testTaxiContent };
                         areaTaxis.push(newTaxi);
-                        
-                        // Remove assigned items from the backlog array
                         backlogStops = backlogStops.filter((_, idx) => !elementsToExtract.includes(idx));
                     } else {
-                        // If remaining groups cannot meet the utilization floor, send them to the Limbo array
                         backlogStops.forEach(group => {
                             globalLimboPassengers.push(...group);
                         });
@@ -298,7 +285,7 @@
                     }
                 }
 
-                // PHASE 3: RENDER VALID VEHICLES
+                // RENDER ACTIVE TAXI VEHICLES WITH CHRONOLOGICAL REROUTING LAYOUTS
                 if (areaTaxis.length > 0) {
                     const areaHeaderDiv = document.createElement('div');
                     areaHeaderDiv.className = 'area-header';
@@ -319,17 +306,21 @@
                             if (countsByStop[sName]) routePlanStrings.push(`${sName} (${countsByStop[sName]} people)`);
                         });
 
+                        // MODIFICATION: Re-ordered Columns inside Table Rows HTML Generation Loop
                         let tableRowsHtml = '';
+                        let passengerIndexCounter = 1; // Counter initialized per taxi vehicle
+
                         stopList.forEach(sName => {
                             let stopPassengers = taxi.passengers.filter(p => p.pickup_stop === sName);
                             stopPassengers.forEach(r => {
                                 tableRowsHtml += `
                                     <tr>
+                                        <td><strong>${passengerIndexCounter++}.</strong></td>
+                                        <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
                                         <td><strong>${r.name}</strong></td>
                                         <td>${r.phone}</td>
                                         <td>${r.visitor_status}</td>
                                         <td>${r.structure}</td>
-                                        <td><span style="background:#eff6ff; color:#1e40af; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
                                         <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
                                     </tr>
                                 `;
@@ -345,11 +336,12 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>Name</th>
+                                            <th style="width: 40px;">#</th>
+                                            <th>Stop Location</th>
+                                            <th>Passenger Name</th>
                                             <th>Phone</th>
                                             <th>Classification</th>
                                             <th>Structure</th>
-                                            <th>Stop</th>
                                             <th>Action</th>
                                         </tr>
                                     </thead>
@@ -362,20 +354,23 @@
                 }
             }
 
-            // PHASE 4: RENDER THE LIMBO BLOCK (IF ANY PASSENGERS ARE UNASSIGNED)
+            // PHASE 4: RENDER THE SECURED LIMBO BLOCK AT THE BOTTOM OF THE LAYOUT WINDOW
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
-                limboDiv.className = 'limbo-block card';
+                limboDiv.className = 'limbo-block';
                 
                 let limboRowsHtml = '';
+                let limboIndexCounter = 1; // Counter initialized for the Limbo system list
+
                 globalLimboPassengers.forEach(r => {
                     limboRowsHtml += `
                         <tr style="background: #fff1f2;">
+                            <td style="color:#9f1239;"><strong>${limboIndexCounter++}.</strong></td>
+                            <td><span style="background:#ffe4e6; color:#9f1239; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
                             <td style="color:#9f1239;"><strong>${r.name}</strong></td>
                             <td style="color:#9f1239;">${r.phone}</td>
                             <td style="color:#9f1239;">${r.visitor_status}</td>
                             <td style="color:#9f1239;">${r.structure}</td>
-                            <td><span style="background:#ffe4e6; color:#9f1239; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
                             <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
                         </tr>
                     `;
@@ -384,17 +379,18 @@
                 limboDiv.innerHTML = `
                     <h3 style="color:#9f1239; margin-bottom: 5px;">⚠️ Unassigned Passengers (${globalLimboPassengers.length} in Limbo)</h3>
                     <p style="font-size:0.85rem; margin-top:0; color:#475569;">
-                        These stops have been placed in limbo because their headcount cannot fit into any existing vehicle's open seats, and opening a new vehicle for them would result in an under-capacity taxi (fewer than 14 passengers).
+                        These stops are currently unassigned because their headcount cannot fit into open capacity slots, and their standalone numbers fall below the efficiency threshold required to operate an exclusive taxi route.
                     </p>
-                    <div style="max-width: 100%; overflow-x: auto; background: white; border-radius:8px; border:1px solid #fecdd3;">
+                    <div style="max-width: 100%; overflow-x: auto; background: white; border-radius:12px; border:1px solid #fecdd3; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
                         <table>
                             <thead>
                                 <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Stop Location</th>
                                     <th>Name</th>
                                     <th>Phone</th>
                                     <th>Classification</th>
                                     <th>Structure</th>
-                                    <th>Stop Location</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -442,10 +438,21 @@
     }
 
     async function deletePassenger(id, name) {
-        if (confirm(`Completely remove ${name} from the master list?`)) {
-            const { error } = await churchDb.from('church_signups').delete().eq('id', id);
-            if (error) alert("Deletion rejected.");
-            else fetchAndCompileLogistics();
+        let securityChallenge = prompt(`🔒 Security Clearance Required:\nEnter Admin Password to completely remove ${name} from the database:`);
+        
+        if (securityChallenge === null) return; 
+        
+        if (securityChallenge === ADMIN_PASSWORD) {
+            if (confirm(`Are you absolutely sure you want to permanently delete ${name}? This action cannot be undone.`)) {
+                const { error } = await churchDb.from('church_signups').delete().eq('id', id);
+                if (error) {
+                    alert("Deletion rejected by database: " + error.message);
+                } else {
+                    fetchAndCompileLogistics(); 
+                }
+            }
+        } else {
+            alert("❌ Access Denied: Incorrect Administrative Password.");
         }
     }
 
