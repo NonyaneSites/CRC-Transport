@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church Sunday Transport Pilot</title>
+    <title>Church Sunday Transport Portal</title>
     <!-- Include Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -21,7 +21,7 @@
             margin: 0;
             padding: 15px;
         }
-        .container { max-width: 600px; margin: 0 auto; }
+        .container { max-width: 650px; margin: 0 auto; }
         .card {
             background: var(--card);
             padding: 24px;
@@ -29,7 +29,7 @@
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
             margin-bottom: 20px;
         }
-        h2 { margin-top: 0; color: #0f172a; font-size: 1.5rem; }
+        h2, h3 { margin-top: 0; color: #0f172a; }
         .form-group { margin-bottom: 16px; }
         label { display: block; margin-bottom: 6px; font-weight: 600; color: #475569; }
         input, select {
@@ -61,69 +61,115 @@
             font-size: 0.9rem;
             margin-bottom: 16px;
         }
-        #bankingScreen { display: none; text-align: center; }
-        .bank-details {
-            background: #f0fdf4;
+        
+        /* Confirmation Message Styles */
+        #confirmationScreen { display: none; }
+        .success-banner {
+            background-color: #dcfce7;
             border: 1px solid #bbf7d0;
+            color: #166534;
             padding: 16px;
             border-radius: 8px;
-            text-align: left;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .bank-details {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
             margin: 15px 0;
         }
         .bank-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+
+        /* Admin UI Panel */
         #adminSection { display: none; margin-top: 30px; }
         .toggle-admin-btn {
             background: #64748b;
             color: white;
-            padding: 8px 12px;
+            padding: 10px 16px;
             border: none;
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             cursor: pointer;
+            font-weight: bold;
         }
         .taxi-card {
-            border-left: 4px solid var(--primary);
+            border-left: 5px solid var(--primary);
             background: #f1f5f9;
-            padding: 12px;
-            margin-bottom: 10px;
+            padding: 16px;
+            margin-bottom: 15px;
             border-radius: 0 8px 8px 0;
         }
-        ol { padding-left: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f1f5f9; }
     </style>
 </head>
 <body>
 
 <div class="container">
 
-    <!-- SCREEN 1: SIGN UP FORM -->
+    <!-- SCREEN 1: THE SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
         <div class="debt-warning">
-            <strong>Notice:</strong> A <strong>R40 fee</strong> is owed immediately upon signing up, even if you change your mind or cannot make it.
+            <strong>Notice:</strong> A <strong>R40 fee</strong> is owed immediately upon signing up. This debt is immediate, even if you cancel or fail to show up on Sunday.
         </div>
+        
         <form id="transportForm">
             <div class="form-group">
-                <label for="fullName">Your Full Name</label>
+                <label for="fullName">Full Name</label>
                 <input type="text" id="fullName" placeholder="e.g. Ayanda Dlamini" required>
             </div>
+
             <div class="form-group">
-                <label for="pickupLocation">Select Your Landmark / Stop</label>
-                <select id="pickupLocation" required>
-                    <option value="" disabled selected>-- Choose your nearest stop --</option>
-                    <option value="Main Road Gas Station">Main Road Gas Station (Stop 1)</option>
-                    <option value="Community Library Plaza">Community Library Plaza (Stop 2)</option>
-                    <option value="Local Primary School Gate">Local Primary School Gate (Stop 3)</option>
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" placeholder="e.g. 0821234567" required>
+            </div>
+
+            <div class="form-group">
+                <label for="visitorStatus">Attendance Status</label>
+                <select id="visitorStatus" required>
+                    <option value="" disabled selected>-- Select Option --</option>
+                    <option value="Member">Member</option>
+                    <option value="Visitor">Visitor</option>
+                    <option value="First Time Visitor">First Time Visitor</option>
                 </select>
             </div>
+
+            <div class="form-group">
+                <label for="structure">Your Structure</label>
+                <input type="text" id="structure" placeholder="e.g. S1, S2, Zone B" required>
+            </div>
+
+            <div class="form-group">
+                <label for="pickupLocation">Select Your Pickup Stop</label>
+                <select id="pickupLocation" required>
+                    <option value="" disabled selected>-- Select Location --</option>
+                    <option value="Argyle">Argyle</option>
+                    <option value="Junction">Junction</option>
+                    <option value="Arteria">Arteria</option>
+                    <option value="Education">Education</option>
+                    <option value="EOH">EOH</option>
+                    <option value="Knockando">Knockando</option>
+                </select>
+            </div>
+
             <button type="submit" id="submitBtn" class="btn">Confirm My Seat & Agree to R40</button>
         </form>
     </div>
 
-    <!-- SCREEN 2: BANKING DETAILS -->
-    <div id="bankingScreen" class="card">
-        <div style="font-size: 3rem; color: var(--success);">✓</div>
-        <h2>Seat Reserved!</h2>
-        <p>Please settle your R40 transport contribution via EFT or your banking app before Sunday service.</p>
+    <!-- SCREEN 2: SUCCESS MESSAGE & BANKING DETAILS -->
+    <div id="confirmationScreen" class="card">
+        <div class="success-banner">
+            🎉 SUCCESS! Your seat has been securely reserved on the Sunday manifest.
+        </div>
+        
+        <h3>Transport Contribution Details</h3>
+        <p>Please settle your R40 transport contribution via EFT/banking app before Sunday morning service.</p>
         
         <div class="bank-details">
             <div class="bank-row"><strong>Bank:</strong> <span>Capitec Bank</span></div>
@@ -133,85 +179,139 @@
             <div class="bank-row"><strong>Amount Due:</strong> <strong>R40.00</strong></div>
             <div class="bank-row" style="color: #c2410c;"><strong>Reference:</strong> <span id="paymentRef">Name</span></div>
         </div>
+        <p style="font-size: 0.85rem; color: #64748b; text-align: center;">If paying cash, hand exact changes to your coordinator upon boarding.</p>
         <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
     </div>
 
-    <!-- ADMIN SECTION -->
-    <div style="text-align: center; margin-top: 40px;">
-        <button class="toggle-admin-btn" onclick="toggleAdminView()">View Admin Manifests</button>
+    <!-- CONTROL PANEL SWITCH (For you to check data) -->
+    <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
+        <button class="toggle-admin-btn" onclick="toggleAdminView()">⚙️ Open Admin Control Dashboard</button>
     </div>
 
+    <!-- ADMIN PANEL VIEW -->
     <div id="adminSection">
+        <!-- Dashboard Block 1: Manifest compiler -->
         <div class="card">
-            <h2>Sunday Driver Manifest</h2>
-            <button class="btn" style="background:#059669; margin-bottom:15px;" onclick="fetchAndCompile()">Refresh From Live Database</button>
-            <p>Vehicle Max Capacity: <strong>17 Seats</strong></p>
+            <h2>🚖 Sunday Smart Taxi Manifests</h2>
+            <p>Vehicle Max Capacity: <strong>17 Seats</strong> (Sorted sequentially by route proximity)</p>
             <div id="manifestContainer"></div>
+        </div>
+
+        <!-- Dashboard Block 2: Daily Checker Spreadsheet view -->
+        <div class="card" style="max-width: 100%; overflow-x: auto;">
+            <h2>📊 All Active Raw Sign-Ups (Daily Tracker)</h2>
+            <p>Total Registrations: <strong id="totalCount">0</strong></p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Structure</th>
+                        <th>Stop</th>
+                    </tr>
+                </thead>
+                <tbody id="rawDataTableBody">
+                    <!-- Data entries go here -->
+                </tbody>
+            </table>
         </div>
     </div>
 
 </div>
 
 <script>
-    // ⚠️ PASTE YOUR SUPABASE CREDENTIALS HERE
+    // ⚠️ PASTE YOUR TRUE SUPABASE DETAILS HERE WHEN LIVE
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co/rest/v1/";
-    const SUPABASE_ANON_KEY = "your-anon-key-here";
+    const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
 
-    const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Fallback variable to run perfectly offline/locally if keys are left blank
+    const isSupabaseConfigured = SUPABASE_URL.indexOf("your-project-id") === -1;
+    let supabase = null;
+    if (isSupabaseConfigured) {
+        supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
     const TAXI_CAPACITY = 17;
-    const STOP_SEQUENCE = ["Main Road Gas Station", "Community Library Plaza", "Local Primary School Gate"];
+    // Sequential route plan provided
+    const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
-    // Handle form submission and save to the cloud database
+    // Handle form submissions
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
-        btn.innerText = "Processing...";
+        btn.innerText = "Saving Seat...";
         btn.disabled = true;
         
-        const nameInput = document.getElementById('fullName').value.trim();
-        const stopInput = document.getElementById('pickupLocation').value;
+        const formData = {
+            name: document.getElementById('fullName').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            visitor_status: document.getElementById('visitorStatus').value,
+            structure: document.getElementById('structure').value.trim(),
+            pickup_stop: document.getElementById('pickupLocation').value
+        };
 
-        // Save to Live Cloud Database
-        const { error } = await supabase
-            .from('church_signups')
-            .insert([{ name: nameInput, pickup_stop: stopInput }]);
-
-        if (error) {
-            alert("Error saving booking. Please check your internet connection.");
-            btn.innerText = "Confirm My Seat & Agree to R40";
-            btn.disabled = false;
-            console.error(error);
+        if (isSupabaseConfigured) {
+            // Send directly to the cloud
+            const { error } = await supabase.from('church_signups').insert([formData]);
+            if (error) {
+                alert("Error sending to database: " + error.message);
+                btn.innerText = "Confirm My Seat & Agree to R40";
+                btn.disabled = false;
+                return;
+            }
         } else {
-            document.getElementById('paymentRef').innerText = `${nameInput.replace(/\s+/g, '')} SUN`;
-            document.getElementById('bookingScreen').style.display = 'none';
-            document.getElementById('bankingScreen').style.display = 'block';
+            // Local fallback simulation for testing in VS code instantly
+            let localList = JSON.parse(localStorage.getItem('mockData')) || [];
+            localList.push(formData);
+            localStorage.setItem('mockData', JSON.stringify(localList));
         }
+
+        // Display Custom Payment Reference and switch screens smoothly
+        document.getElementById('paymentRef').innerText = `${formData.name.replace(/\s+/g, '')}SUN`;
+        document.getElementById('bookingScreen').style.display = 'none';
+        document.getElementById('confirmationScreen').style.display = 'block';
     });
 
-    // Fetch the list from the cloud and run the sorting logic
-    async function fetchAndCompile() {
-        const container = document.getElementById('manifestContainer');
-        container.innerHTML = '<p>Loading live signups...</p>';
+    // Fetch and compile system information
+    async function refreshDashboardData() {
+        let records = [];
 
-        // Get records from Supabase
-        const { data: signUps, error } = await supabase
-            .from('church_signups')
-            .select('*');
-
-        if (error) {
-            container.innerHTML = '<p style="color:red;">Failed to load live data.</p>';
-            return;
+        if (isSupabaseConfigured) {
+            const { data, error } = await supabase.from('church_signups').select('*').order('created_at', { ascending: false });
+            if (!error) records = data;
+        } else {
+            records = JSON.parse(localStorage.getItem('mockData')) || [];
         }
 
-        if(!signUps || signUps.length === 0) {
-            container.innerHTML = '<p style="color:#94a3b8;">No passengers have signed up yet.</p>';
-            return;
+        // Render part 1: Daily Tracker Spreadsheet Table View
+        document.getElementById('totalCount').innerText = records.length;
+        const tbody = document.getElementById('rawDataTableBody');
+        tbody.innerHTML = '';
+        
+        if(records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">No entries found.</td></tr>';
+        } else {
+            records.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${r.name}</strong></td>
+                    <td>${r.phone}</td>
+                    <td>${r.visitor_status}</td>
+                    <td>${r.structure}</td>
+                    <td><span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:bold;">${r.pickup_stop}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
-        // Group names by stop sequence
+        // Render part 2: Split passengers into 17-seater taxis logically by sequence
+        const manifestContainer = document.getElementById('manifestContainer');
+        manifestContainer.innerHTML = '';
+
         let groups = {};
         STOP_SEQUENCE.forEach(stop => groups[stop] = []);
-        signUps.forEach(p => {
+        records.forEach(p => {
             if (groups[p.pickup_stop]) groups[p.pickup_stop].push(p.name);
         });
 
@@ -224,8 +324,8 @@
                 let emptySeats = TAXI_CAPACITY - currentTaxi.passengers.length;
                 let boardingList = namesAtStop.splice(0, emptySeats);
 
-                boardingList.forEach(passengerName => {
-                    currentTaxi.passengers.push({ name: passengerName, stop: stop });
+                boardingList.forEach(name => {
+                    currentTaxi.passengers.push({ name: name, stop: stop });
                 });
 
                 if(currentTaxi.passengers.length === TAXI_CAPACITY) {
@@ -239,8 +339,11 @@
             taxis.push(currentTaxi);
         }
 
-        // Render sorted manifests
-        container.innerHTML = '';
+        if(records.length === 0) {
+            manifestContainer.innerHTML = '<p style="color:#94a3b8;">No manifests can be compiled yet.</p>';
+            return;
+        }
+
         taxis.forEach(taxi => {
             const div = document.createElement('div');
             div.className = 'taxi-card';
@@ -251,31 +354,29 @@
                 summaryByStop[p.stop].push(p.name);
             });
 
-            let listItemsHtml = '';
+            let stopHtml = '';
             for(let stopName in summaryByStop) {
-                listItemsHtml += `<li><strong>${stopName} (${summaryByStop[stopName].length} people):</strong>
-                    <ol>${summaryByStop[stopName].map(n => `<li>${n}</li>`).join('')}</ol>
-                </li>`;
+                stopHtml += `<div style="margin-bottom:8px;"><strong>📍 Stop ${stopName} (${summaryByStop[stopName].length} people):</strong> ${summaryByStop[stopName].join(', ')}</div>`;
             }
 
             div.innerHTML = `
-                <h3 style="margin: 0 0 8px 0; color: #1e3a8a;">Taxi #${taxi.id} (${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled)</h3>
-                <ul style="margin: 0; padding-left: 15px;">${listItemsHtml}</ul>
+                <h3 style="color:#1e40af; margin-bottom:10px;">Taxi #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Filled)</h3>
+                ${stopHtml}
             `;
-            container.appendChild(div);
+            manifestContainer.appendChild(div);
         });
     }
 
+    // Toggle Visibility of the Admin Panel
     function toggleAdminView() {
         const panel = document.getElementById('adminSection');
         if(panel.style.display === 'block') {
             panel.style.display = 'none';
         } else {
             panel.style.display = 'block';
-            fetchAndCompile();
+            refreshDashboardData();
         }
     }
 </script>
 </body>
 </html>
-
