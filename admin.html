@@ -1,1 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transport Administration Console</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --success: #059669;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #334155;
+            --error: #dc2626;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            display: none; /* Hidden until password verification passes */
+        }
+        .container { max-width: 750px; margin: 0 auto; }
+        .card {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        h2, h3 { margin-top: 0; color: #0f172a; }
+        .diagnostic-box {
+            background-color: #f1f5f9;
+            border: 2px dashed #94a3b8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        .status-good { color: var(--success); font-weight: bold; }
+        .status-bad { color: var(--error); font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 6px; }
+        .date-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1e40af;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+        .taxi-card {
+            border-left: 5px solid var(--primary);
+            background: #f1f5f9;
+            padding: 16px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f1f5f9; }
+        .delete-btn {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
 
+<div class="container">
+
+    <div class="diagnostic-box">
+        <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
+        <div id="diagnosticStatus" class="status-good">Connecting...</div>
+    </div>
+
+    <div class="card">
+        <h2>🚖 Sunday Compiled Taxi Rosters</h2>
+        <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
+        <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data</button>
+        <p>Vehicle Limit: <strong>17 Seats Max</strong> (Sorted sequentially by route proximity)</p>
+        <div id="manifestContainer"></div>
+    </div>
+
+    <div class="card" style="max-width: 100%; overflow-x: auto;">
+        <h2>📊 Live Passenger Database (Daily Checker Tracker)</h2>
+        <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Classification</th>
+                    <th>Structure</th>
+                    <th>Stop</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="rawDataTableBody"></tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
+    const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
+    const ADMIN_PASSWORD = "Church2026"; 
+    const TAXI_CAPACITY = 17;
+    const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
+
+    let churchDb = null;
+    const diagnostic = document.getElementById('diagnosticStatus');
+
+    // Prompt gate on immediate page access
+    const authAttempt = prompt("Enter Administrative Security Password to Access Console:");
+    if (authAttempt === ADMIN_PASSWORD) {
+        document.body.style.display = "block";
+        initializeAdmin();
+    } else {
+        alert("❌ Access Denied.");
+        window.location.href = "index.html"; // Boot intruders back to the form
+    }
+
+    function initializeAdmin() {
+        try {
+            churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            diagnostic.innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
+            fetchAndCompileLogistics();
+            calculateUpcomingSunday();
+        } catch(err) {
+            diagnostic.className = "status-bad";
+            diagnostic.innerHTML = "🚨 Connection Error: " + err.message;
+        }
+    }
+
+    function calculateUpcomingSunday() {
+        let today = new Date();
+        let dayOfWeek = today.getDay(); 
+        let daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        let targetSunday = new Date(today);
+        targetSunday.setDate(today.getDate() + daysUntilSunday);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.querySelectorAll('.targetSundayDate').forEach(el => {
+            el.innerText = targetSunday.toLocaleDateString('en-ZA', options);
+        });
+    }
+
+    async function fetchAndCompileLogistics() {
+        try {
+            const { data: records, error } = await churchDb
+                .from('church_signups')
+                .select('*')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                diagnostic.className = "status-bad";
+                diagnostic.innerHTML = "🚨 Database Error: " + error.message;
+                return;
+            }
+
+            diagnostic.className = "status-good";
+            diagnostic.innerHTML = "🟢 Cloud synchronization verified. Data is live.";
+
+            document.getElementById('totalCount').innerText = records.length;
+            const tbody = document.getElementById('rawDataTableBody');
+            tbody.innerHTML = '';
+            
+            if(records.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">No entries found.</td></tr>';
+            } else {
+                records.forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${r.name}</strong></td>
+                        <td>${r.phone}</td>
+                        <td>${r.visitor_status}</td>
+                        <td>${r.structure}</td>
+                        <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; font-weight:bold;">${r.pickup_stop}</span></td>
+                        <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Delete</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            const manifestContainer = document.getElementById('manifestContainer');
+            manifestContainer.innerHTML = '';
+
+            if(records.length === 0) {
+                manifestContainer.innerHTML = '<p style="color:#94a3b8;">No passengers registered to sort.</p>';
+                return;
+            }
+
+            let stopBuckets = {};
+            STOP_SEQUENCE.forEach(stop => stopBuckets[stop] = []);
+            records.forEach(p => {
+                if (stopBuckets[p.pickup_stop]) {
+                    stopBuckets[p.pickup_stop].push(`${p.name} (${p.structure})`);
+                }
+            });
+
+            let taxis = [];
+            let currentTaxi = { id: 1, passengers: [] };
+
+            STOP_SEQUENCE.forEach(stop => {
+                let individualsAtStop = stopBuckets[stop];
+                while(individualsAtStop.length > 0) {
+                    let availableSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    let boardingBatch = individualsAtStop.splice(0, availableSeats);
+
+                    boardingBatch.forEach(passenger => {
+                        currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                    });
+
+                    if(currentTaxi.passengers.length === TAXI_CAPACITY) {
+                        taxis.push(currentTaxi);
+                        currentTaxi = { id: taxis.length + 1, passengers: [] };
+                    }
+                }
+            });
+
+            if(currentTaxi.passengers.length > 0) {
+                taxis.push(currentTaxi);
+            }
+
+            taxis.forEach(taxi => {
+                const div = document.createElement('div');
+                div.className = 'taxi-card';
+                let structureByStop = {};
+                taxi.passengers.forEach(p => {
+                    if(!structureByStop[p.stopName]) structureByStop[p.stopName] = [];
+                    structureByStop[p.stopName].push(p.passengerDetails);
+                });
+
+                let stopBreakdownHtml = '';
+                for(let sName in structureByStop) {
+                    stopBreakdownHtml += `<div style="margin-top:6px;"><strong>📍 Stop ${sName} (${structureByStop[sName].length} people):</strong> ${structureByStop[sName].join(', ')}</div>`;
+                }
+
+                div.innerHTML = `
+                    <h3 style="color:#1e40af; margin:0 0 8px 0;">Taxi #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Occupied)</h3>
+                    ${stopBreakdownHtml}
+                `;
+                manifestContainer.appendChild(div);
+            });
+
+        } catch(err) {
+            alert("Exception parsing registers.");
+        }
+    }
+
+    async function deletePassenger(id, name) {
+        if (confirm(`Completely remove ${name} from the master list?`)) {
+            const { error } = await churchDb.from('church_signups').delete().eq('id', id);
+            if (error) alert("Deletion rejected.");
+            else fetchAndCompileLogistics();
+        }
+    }
+</script>
+</body>
+</html>
