@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
-    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -186,13 +184,11 @@
 
 <div class="container">
 
-    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
-    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -204,7 +200,6 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
-    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
 </div>
@@ -216,7 +211,6 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // DEFINING MASTER ROUTE CONFIGURATION SCHEMA (BRAAM ROUTE USES EXCLUSIVE NORMALIZED OVERRIDE MATCH)
     const REGIONAL_ROUTES = {
         "Braam Route": ["Braam"],
         "Auckland Park Route": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
@@ -224,7 +218,6 @@
         "Parktown Route": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
     };
 
-    // EXCLUSIVE DIRECT ISOLATION KEY FOR THE SPECIFIED BRAAM BUS STOPS
     const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
     let churchDb = null;
@@ -254,6 +247,7 @@
         });
     }
 
+    // Toggle function for Taxis accordion
     function toggleTaxiView(globalId) {
         const targetContentBlock = document.getElementById(`taxi-content-${globalId}`);
         const targetBadge = document.getElementById(`taxi-badge-${globalId}`);
@@ -271,6 +265,7 @@
         }
     }
 
+    // Toggle function for Limbo accordion
     function toggleLimboView() {
         const targetContentBlock = document.getElementById('limbo-content-block');
         const targetBadge = document.getElementById('limbo-toggle-badge');
@@ -330,14 +325,14 @@
                 return;
             }
 
-            // DATA PRE-PROCESSING: REMAP EXCLUSIVE BRAAM LOCATIONS IMMEDIATELY
+            // Remap Braam locations immediately
             let workingPool = records.map(r => {
                 let areaName = "Unknown Route";
                 let displayStop = r.pickup_stop;
                 
                 if (EXCLUSIVE_BRAAM_STOPS.includes(r.pickup_stop)) {
                     areaName = "Braam Route";
-                    displayStop = "Braam"; // Normalized override
+                    displayStop = "Braam"; 
                 } else {
                     for (let [aKey, sList] of Object.entries(REGIONAL_ROUTES)) {
                         if (sList.includes(r.pickup_stop)) { areaName = aKey; break; }
@@ -348,7 +343,7 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACTION OF NATIVE MULTIPLES >= 17 (INCLUDING CONSOLIDATED BRAAM)
+            // PASS 1: EXTRACTION OF PURE NATIVE MULTIPLES >= 17
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 stopList.forEach(sName => {
                     let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
@@ -390,7 +385,7 @@
                 }
             }
 
-            // PASS 3: GLOBAL SEQUENTIAL COMPONENT CONSOLIDATION LOOP
+            // PASS 3: ADVANCED GLOBAL LEFTOVER BEST-FIT KNAPSACK ENGINE
             let globalLeftoverStops = [];
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 stopList.forEach(sName => {
@@ -401,36 +396,63 @@
                 });
             }
 
-            let currentConsolidatedTaxi = { passengers: [] };
+            // Run priority packing protocols on global leftovers
+            while (globalLeftoverStops.length > 0) {
+                let currentConsolidatedTaxi = { passengers: [] };
+                
+                // Seed the taxi with the first available chronological group block
+                let seedGroup = globalLeftoverStops.shift();
+                currentConsolidatedTaxi.passengers.push(...seedGroup.passengers);
 
-            globalLeftoverStops.forEach(group => {
-                let ridersToPlace = [...group.passengers];
-                while (ridersToPlace.length > 0) {
-                    let availableSeats = TAXI_CAPACITY - currentConsolidatedTaxi.passengers.length;
-                    if (ridersToPlace.length <= availableSeats) {
-                        currentConsolidatedTaxi.passengers.push(...ridersToPlace);
-                        ridersToPlace = [];
-                    } else {
-                        let sliceBatch = ridersToPlace.splice(0, availableSeats);
+                // Run strict priority-check loop until vehicle is filled to 17
+                while (currentConsolidatedTaxi.passengers.length < TAXI_CAPACITY && globalLeftoverStops.length > 0) {
+                    let openSeats = TAXI_CAPACITY - currentConsolidatedTaxi.passengers.length;
+
+                    // PRIORITY 1: Search the entire city backlog for a perfect unbroken headcount match
+                    let matchIndex = globalLeftoverStops.findIndex(g => g.passengers.length === openSeats);
+
+                    // PRIORITY 2: If no perfect match, search for the LARGEST whole group that fits unbroken
+                    if (matchIndex === -1) {
+                        let validWholeFits = globalLeftoverStops
+                            .map((g, idx) => ({ g, idx }))
+                            .filter(item => item.g.passengers.length <= openSeats);
+                        
+                        if (validWholeFits.length > 0) {
+                            validWholeFits.sort((a, b) => b.g.passengers.length - a.g.passengers.length);
+                            matchIndex = validWholeFits[0].idx;
+                        }
+                    }
+
+                    // PRIORITY 3: Absolute Last Resort—slice fractionally from the next sequential group
+                    if (matchIndex === -1) {
+                        let nextGroup = globalLeftoverStops[0];
+                        let sliceBatch = nextGroup.passengers.splice(0, openSeats);
                         currentConsolidatedTaxi.passengers.push(...sliceBatch);
-                        finalizedTaxis.push(currentConsolidatedTaxi);
-                        currentConsolidatedTaxi = { passengers: [] };
+                        
+                        if (nextGroup.passengers.length === 0) {
+                            globalLeftoverStops.shift();
+                        }
+                    } else {
+                        // A group fits completely without splitting—pull them out of backlog array
+                        let matchedGroup = globalLeftoverStops.splice(matchIndex, 1)[0];
+                        currentConsolidatedTaxi.passengers.push(...matchedGroup.passengers);
                     }
                 }
-            });
 
-            if (currentConsolidatedTaxi.passengers.length > 0) {
+                // Verify capacity thresholds before committing vehicle
                 if (currentConsolidatedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     finalizedTaxis.push(currentConsolidatedTaxi);
                 } else {
+                    // Fail bounds check -> De-allocate passengers to trigger Limbo dump block
                     currentConsolidatedTaxi.passengers.forEach(p => p.assigned = false);
                 }
             }
 
+            // Sync structural parameters
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
 
-            // PHASE 4: RE-ENGINEERED INTERACTIVE RENDER SCHEDULER (No high-level static area containers)
+            // PHASE 4: RENDER COMPACT NOTES ACCORDIONS WITH MAJORITY MANIFEST TITLES
             let globalTaxiCounter = 1;
 
             finalizedTaxis.forEach(taxi => {
@@ -438,16 +460,15 @@
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
-                // ALGORITHM MODIFICATION: MAJORITY AREA RUNTIME ALLOCATION
+                // Runtime Calculation of Majority Location Representation
                 let areaTallyMap = {};
                 taxi.passengers.forEach(p => {
                     areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1;
                 });
-                // Sort to find the dominant geographical area
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
                 let dynamicRouteHeaderTitle = `${majorityArea} Manifest`;
 
-                // Calculate plan descriptors
+                // Compute route summaries
                 let countSummaryMap = {};
                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
@@ -463,12 +484,12 @@
                 let tableRowsHtml = '';
                 let passengerIndexCounter = 1;
 
-                // Sort and print table items chronologically based on route configurations
+                // Sort table rows chronologically by route alignment mapping configurations
                 for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                     stopList.forEach(sName => {
                         let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
                         stopPassengers.forEach(r => {
-                            // MINORITY EXTRACTION HIGHLIGHTING CRITERIA
+                            // MINORITY CROSS-ROUTE CONDITIONAL HIGHLIGHTING
                             let isMinorityRider = r.sourceArea !== majorityArea;
                             let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
                             let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
