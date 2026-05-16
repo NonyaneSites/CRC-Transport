@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Church Sunday Transport Pilot</title>
+    <!-- Include Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --success: #059669;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #334155;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        h2 { margin-top: 0; color: #0f172a; font-size: 1.5rem; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; color: #475569; }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .debt-warning {
+            background-color: #fffbeb;
+            border: 1px solid #fef08a;
+            color: #854d0e;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+        #bankingScreen { display: none; text-align: center; }
+        .bank-details {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: left;
+            margin: 15px 0;
+        }
+        .bank-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        #adminSection { display: none; margin-top: 30px; }
+        .toggle-admin-btn {
+            background: #64748b;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .taxi-card {
+            border-left: 4px solid var(--primary);
+            background: #f1f5f9;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+        ol { padding-left: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- SCREEN 1: SIGN UP FORM -->
+    <div id="bookingScreen" class="card">
+        <h2>Sunday Transport Sign-Up</h2>
+        <div class="debt-warning">
+            <strong>Notice:</strong> A <strong>R40 fee</strong> is owed immediately upon signing up, even if you change your mind or cannot make it.
+        </div>
+        <form id="transportForm">
+            <div class="form-group">
+                <label for="fullName">Your Full Name</label>
+                <input type="text" id="fullName" placeholder="e.g. Ayanda Dlamini" required>
+            </div>
+            <div class="form-group">
+                <label for="pickupLocation">Select Your Landmark / Stop</label>
+                <select id="pickupLocation" required>
+                    <option value="" disabled selected>-- Choose your nearest stop --</option>
+                    <option value="Main Road Gas Station">Main Road Gas Station (Stop 1)</option>
+                    <option value="Community Library Plaza">Community Library Plaza (Stop 2)</option>
+                    <option value="Local Primary School Gate">Local Primary School Gate (Stop 3)</option>
+                </select>
+            </div>
+            <button type="submit" id="submitBtn" class="btn">Confirm My Seat & Agree to R40</button>
+        </form>
+    </div>
+
+    <!-- SCREEN 2: BANKING DETAILS -->
+    <div id="bankingScreen" class="card">
+        <div style="font-size: 3rem; color: var(--success);">✓</div>
+        <h2>Seat Reserved!</h2>
+        <p>Please settle your R40 transport contribution via EFT or your banking app before Sunday service.</p>
+        
+        <div class="bank-details">
+            <div class="bank-row"><strong>Bank:</strong> <span>Capitec Bank</span></div>
+            <div class="bank-row"><strong>Account Name:</strong> <span>Church Transport</span></div>
+            <div class="bank-row"><strong>Account Number:</strong> <span>1234567890</span></div>
+            <div class="bank-row"><strong>Branch Code:</strong> <span>470010</span></div>
+            <div class="bank-row"><strong>Amount Due:</strong> <strong>R40.00</strong></div>
+            <div class="bank-row" style="color: #c2410c;"><strong>Reference:</strong> <span id="paymentRef">Name</span></div>
+        </div>
+        <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
+    </div>
+
+    <!-- ADMIN SECTION -->
+    <div style="text-align: center; margin-top: 40px;">
+        <button class="toggle-admin-btn" onclick="toggleAdminView()">View Admin Manifests</button>
+    </div>
+
+    <div id="adminSection">
+        <div class="card">
+            <h2>Sunday Driver Manifest</h2>
+            <button class="btn" style="background:#059669; margin-bottom:15px;" onclick="fetchAndCompile()">Refresh From Live Database</button>
+            <p>Vehicle Max Capacity: <strong>17 Seats</strong></p>
+            <div id="manifestContainer"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ⚠️ PASTE YOUR SUPABASE CREDENTIALS HERE
+    const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co/rest/v1/";
+    const SUPABASE_ANON_KEY = "your-anon-key-here";
+
+    const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const TAXI_CAPACITY = 17;
+    const STOP_SEQUENCE = ["Main Road Gas Station", "Community Library Plaza", "Local Primary School Gate"];
+
+    // Handle form submission and save to the cloud database
+    document.getElementById('transportForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "Processing...";
+        btn.disabled = true;
+        
+        const nameInput = document.getElementById('fullName').value.trim();
+        const stopInput = document.getElementById('pickupLocation').value;
+
+        // Save to Live Cloud Database
+        const { error } = await supabase
+            .from('church_signups')
+            .insert([{ name: nameInput, pickup_stop: stopInput }]);
+
+        if (error) {
+            alert("Error saving booking. Please check your internet connection.");
+            btn.innerText = "Confirm My Seat & Agree to R40";
+            btn.disabled = false;
+            console.error(error);
+        } else {
+            document.getElementById('paymentRef').innerText = `${nameInput.replace(/\s+/g, '')} SUN`;
+            document.getElementById('bookingScreen').style.display = 'none';
+            document.getElementById('bankingScreen').style.display = 'block';
+        }
+    });
+
+    // Fetch the list from the cloud and run the sorting logic
+    async function fetchAndCompile() {
+        const container = document.getElementById('manifestContainer');
+        container.innerHTML = '<p>Loading live signups...</p>';
+
+        // Get records from Supabase
+        const { data: signUps, error } = await supabase
+            .from('church_signups')
+            .select('*');
+
+        if (error) {
+            container.innerHTML = '<p style="color:red;">Failed to load live data.</p>';
+            return;
+        }
+
+        if(!signUps || signUps.length === 0) {
+            container.innerHTML = '<p style="color:#94a3b8;">No passengers have signed up yet.</p>';
+            return;
+        }
+
+        // Group names by stop sequence
+        let groups = {};
+        STOP_SEQUENCE.forEach(stop => groups[stop] = []);
+        signUps.forEach(p => {
+            if (groups[p.pickup_stop]) groups[p.pickup_stop].push(p.name);
+        });
+
+        let taxis = [];
+        let currentTaxi = { id: 1, passengers: [] };
+
+        STOP_SEQUENCE.forEach(stop => {
+            let namesAtStop = groups[stop];
+            while(namesAtStop.length > 0) {
+                let emptySeats = TAXI_CAPACITY - currentTaxi.passengers.length;
+                let boardingList = namesAtStop.splice(0, emptySeats);
+
+                boardingList.forEach(passengerName => {
+                    currentTaxi.passengers.push({ name: passengerName, stop: stop });
+                });
+
+                if(currentTaxi.passengers.length === TAXI_CAPACITY) {
+                    taxis.push(currentTaxi);
+                    currentTaxi = { id: taxis.length + 1, passengers: [] };
+                }
+            }
+        });
+
+        if(currentTaxi.passengers.length > 0) {
+            taxis.push(currentTaxi);
+        }
+
+        // Render sorted manifests
+        container.innerHTML = '';
+        taxis.forEach(taxi => {
+            const div = document.createElement('div');
+            div.className = 'taxi-card';
+            
+            let summaryByStop = {};
+            taxi.passengers.forEach(p => {
+                if(!summaryByStop[p.stop]) summaryByStop[p.stop] = [];
+                summaryByStop[p.stop].push(p.name);
+            });
+
+            let listItemsHtml = '';
+            for(let stopName in summaryByStop) {
+                listItemsHtml += `<li><strong>${stopName} (${summaryByStop[stopName].length} people):</strong>
+                    <ol>${summaryByStop[stopName].map(n => `<li>${n}</li>`).join('')}</ol>
+                </li>`;
+            }
+
+            div.innerHTML = `
+                <h3 style="margin: 0 0 8px 0; color: #1e3a8a;">Taxi #${taxi.id} (${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled)</h3>
+                <ul style="margin: 0; padding-left: 15px;">${listItemsHtml}</ul>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function toggleAdminView() {
+        const panel = document.getElementById('adminSection');
+        if(panel.style.display === 'block') {
+            panel.style.display = 'none';
+        } else {
+            panel.style.display = 'block';
+            fetchAndCompile();
+        }
+    }
+</script>
+</body>
+</html>
+
