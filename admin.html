@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -21,7 +24,7 @@
             margin: 0;
             padding: 15px;
         }
-        .container { max-width: 800px; margin: 0 auto; }
+        .container { max-width: 900px; margin: 0 auto; }
         .card {
             background: var(--card);
             padding: 24px;
@@ -53,23 +56,41 @@
         .area-header {
             background: #1e3a8a;
             color: white;
-            padding: 8px 16px;
-            border-radius: 6px;
-            margin-top: 25px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            margin-top: 35px;
             margin-bottom: 15px;
-            font-size: 1.2rem;
+            font-size: 1.3rem;
             font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .taxi-card {
-            border-left: 5px solid var(--success);
+        .vehicle-block {
+            background: var(--card);
+            border: 1px solid #cbd5e1;
+            border-left: 6px solid var(--success);
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 4px 12px 12px 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .vehicle-title {
+            color: #065f46;
+            margin-bottom: 12px;
+            font-size: 1.2rem;
+            border-bottom: 2px dashed #cbd5e1;
+            padding-bottom: 6px;
+        }
+        .stop-summary-inline {
             background: #f1f5f9;
-            padding: 16px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9rem;
             margin-bottom: 15px;
-            border-radius: 0 8px 8px 0;
+            color: #475569;
         }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        th { background: #f1f5f9; }
+        th { background: #f8fafc; color: #475569; font-weight: 600; }
         .delete-btn {
             background: #fee2e2;
             color: #b91c1c;
@@ -79,16 +100,19 @@
             cursor: pointer;
             font-weight: bold;
         }
+        .delete-btn:hover { background: #fca5a5; }
         .refresh-btn {
             background: var(--success);
             color: white;
             border: none;
-            padding: 10px 16px;
-            border-radius: 6px;
+            padding: 12px 20px;
+            border-radius: 8px;
             font-weight: bold;
             cursor: pointer;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
+            font-size: 1rem;
         }
+        .refresh-btn:hover { background: #047857; }
     </style>
 </head>
 <body>
@@ -103,28 +127,12 @@
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-        <br>
-        <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data</button>
-        <p>Vehicle Limit: <strong>17 Seats Max per Taxi</strong> (Optimized by unsplit stop allocations)</p>
-        <div id="manifestContainer"></div>
-    </div>
-
-    <div class="card" style="max-width: 100%; overflow-x: auto;">
-        <h2>📊 Live Passenger Database (Daily Checker Tracker)</h2>
-        <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Phone</th>
-                    <th>Classification</th>
-                    <th>Structure</th>
-                    <th>Stop</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="rawDataTableBody"></tbody>
-        </table>
+        <p style="margin-bottom: 20px;">Total Confirmed Sign-ups Across All Routes: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
+        
+        <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
+        <p style="font-size: 0.85rem; color:#64748b; margin-top:5px;">Passengers are cleanly separated below by vehicle using the "no-split stop" layout rule (17 seats limit).</p>
+        
+        <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
 </div>
@@ -134,7 +142,6 @@
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const TAXI_CAPACITY = 17;
 
-    // Corrected Route Sequence Matrix Mapping
     const REGIONAL_ROUTES = {
         "Braam Route": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA"],
         "Auckland Park Route": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
@@ -184,51 +191,33 @@
 
             diagnostic.className = "status-good";
             diagnostic.innerHTML = "🟢 Cloud synchronization verified. Data is live.";
-
             document.getElementById('totalCount').innerText = records.length;
-            const tbody = document.getElementById('rawDataTableBody');
-            tbody.innerHTML = '';
-            
-            if(records.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#94a3b8;">No entries found.</td></tr>';
-            } else {
-                records.forEach(r => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td><strong>${r.name}</strong></td>
-                        <td>${r.phone}</td>
-                        <td>${r.visitor_status}</td>
-                        <td>${r.structure}</td>
-                        <td><span style="background:#e0f2fe; color:#0369a1; padding:4px 8px; border-radius:4px; font-weight:bold;">${r.pickup_stop}</span></td>
-                        <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Delete</button></td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
 
             const manifestContainer = document.getElementById('manifestContainer');
             manifestContainer.innerHTML = '';
 
             if(records.length === 0) {
-                manifestContainer.innerHTML = '<p style="color:#94a3b8;">No passengers registered to sort.</p>';
+                manifestContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; padding: 20px;">No passenger signups found in the cloud database yet.</p>';
                 return;
             }
 
-            // INDEPENDENT GEOGRAPHIC ROUTING ENGINE WITH ATOMIC ASSIGNMENTS
+            // LOOP THROUGH EACH INDEPENDENT AREA TO COMPILE LOGISTICS SEPARATELY
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 let areaRecords = records.filter(r => stopList.includes(r.pickup_stop));
                 if (areaRecords.length === 0) continue; 
 
+                // Area Header Render Block
                 const areaHeaderDiv = document.createElement('div');
                 areaHeaderDiv.className = 'area-header';
-                areaHeaderDiv.innerText = `📍 ${areaName} Manifests`;
+                areaHeaderDiv.innerText = `📍 ${areaName}`;
                 manifestContainer.appendChild(areaHeaderDiv);
 
+                // Group full record data objects by stop locations
                 let stopBuckets = {};
                 stopList.forEach(stop => stopBuckets[stop] = []);
                 areaRecords.forEach(p => {
                     if (stopBuckets[p.pickup_stop]) {
-                        stopBuckets[p.pickup_stop].push(`${p.name} (${p.structure})`);
+                        stopBuckets[p.pickup_stop].push(p); // Saving full row object instead of a string
                     }
                 });
 
@@ -242,7 +231,7 @@
 
                     let remainingSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
 
-                    // Overflow Guard: If entire stop headcount exceeds remaining vacancy, push stop to next clean vehicle
+                    // Overflow Guard: Push the whole stop group to a clean vehicle if they exceed current vacancy
                     if (individualsAtStop.length > remainingSeats) {
                         if (currentTaxi.passengers.length > 0) {
                             taxis.push(currentTaxi);
@@ -250,20 +239,20 @@
                         }
                     }
 
-                    // Turnout Exception Handler: If a single stop has >17 people, fill whole taxis completely
+                    // Turnout Exception Handler: If a single stop has > 17 people on its own
                     while (individualsAtStop.length > TAXI_CAPACITY) {
                         let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
-                        fullTaxiBatch.forEach(passenger => {
-                            currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                        fullTaxiBatch.forEach(recordObj => {
+                            currentTaxi.passengers.push(recordObj);
                         });
                         taxis.push(currentTaxi);
                         currentTaxi = { id: taxis.length + 1, passengers: [] };
                     }
 
-                    // Safe Assignment: Put remaining group smoothly into current vehicle
+                    // Safe Assignment: Put group cleanly into the current taxi vacancy
                     if (individualsAtStop.length > 0) {
-                        individualsAtStop.forEach(passenger => {
-                            currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                        individualsAtStop.forEach(recordObj => {
+                            currentTaxi.passengers.push(recordObj);
                         });
                     }
                 });
@@ -272,26 +261,60 @@
                     taxis.push(currentTaxi);
                 }
 
-                // Render optimized layouts
+                // RENDER VEHICLE BLOCKS WITH THEIR ASSOCIATED SPREADSHEET DATABASES
                 taxis.forEach(taxi => {
-                    const div = document.createElement('div');
-                    div.className = 'taxi-card';
-                    let structureByStop = {};
-                    taxi.passengers.forEach(p => {
-                        if(!structureByStop[p.stopName]) structureByStop[p.stopName] = [];
-                        structureByStop[p.stopName].push(p.passengerDetails);
-                    });
+                    const vehicleDiv = document.createElement('div');
+                    vehicleDiv.className = 'vehicle-block';
 
-                    let stopBreakdownHtml = '';
-                    for(let sName in structureByStop) {
-                        stopBreakdownHtml += `<div style="margin-top:6px;"><strong>🔹 ${sName} (${structureByStop[sName].length} people):</strong> ${structureByStop[sName].join(', ')}</div>`;
+                    // Calculate internal stop metrics for driver summary text
+                    let countsByStop = {};
+                    taxi.passengers.forEach(p => {
+                        countsByStop[p.pickup_stop] = (countsByStop[p.pickup_stop] || 0) + 1;
+                    });
+                    let summaryStrings = [];
+                    for (let [sName, headcount] of Object.entries(countsByStop)) {
+                        summaryStrings.push(`${sName} (${headcount} people)`);
                     }
 
-                    div.innerHTML = `
-                        <h3 style="color:#065f46; margin:0 0 8px 0;">Vehicle #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Seats Occupied)</h3>
-                        ${stopBreakdownHtml}
+                    // Generate spreadsheet rows specifically for this vehicle's passengers
+                    let tableRowsHtml = '';
+                    taxi.passengers.forEach(r => {
+                        tableRowsHtml += `
+                            <tr>
+                                <td><strong>${r.name}</strong></td>
+                                <td>${r.phone}</td>
+                                <td>${r.visitor_status}</td>
+                                <td>${r.structure}</td>
+                                <td><span style="background:#eff6ff; color:#1e40af; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
+                                <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
+                            </tr>
+                        `;
+                    });
+
+                    vehicleDiv.innerHTML = `
+                        <div class="vehicle-title">🚍 Vehicle #${taxi.id} — Allocation: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled</div>
+                        <div class="stop-summary-inline">
+                            <strong>Driver Route Summary:</strong> ${summaryStrings.join(' ➔ ')}
+                        </div>
+                        <div style="max-width: 100%; overflow-x: auto;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Classification</th>
+                                        <th>Structure</th>
+                                        <th>Stop</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${tableRowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
                     `;
-                    manifestContainer.appendChild(div);
+                    manifestContainer.appendChild(vehicleDiv);
                 });
             }
 
