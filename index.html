@@ -142,10 +142,10 @@
                 <label for="pickupArea">Select Transport Area</label>
                 <select id="pickupArea" required onchange="updateStopsDropdown()">
                     <option value="" disabled selected>-- Choose Area --</option>
-                    <option value="Braam">Braam</option>
-                    <option value="Auckland Park">Auckland Park</option>
                     <option value="CBD">CBD</option>
                     <option value="Parktown">Parktown</option>
+                    <option value="Braam">Braam</option>
+                    <option value="Auckland Park">Auckland Park</option>
                 </select>
             </div>
 
@@ -191,12 +191,12 @@
 
     const churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ADDED GATE 7 TO THE BRAAM AREA ARRAY MATRIX
+    // COMPACT MAP ALIGNED TO THE MASTER OPTIMAL PATTERNS
     const STOPS_DATA = {
-        "Braam": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"],
-        "Auckland Park": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
-        "CBD": ["DFC Bus Stop", "Focus 2", "Gateway", "Ghandi Square", "Maboneng", "Saratoga", "Shell Mooi Street", "Urban Circle", "The Fields", "Focus 1"],
-        "Parktown": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
+        "CBD": ["Ghandi", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
+        "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
+        "Braam": ["Braam", "56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"],
+        "Auckland Park": ["UJ bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonalds"]
     };
 
     function updateStopsDropdown() {
