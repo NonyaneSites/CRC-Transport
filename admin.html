@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -106,7 +105,7 @@
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
         <br>
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data</button>
-        <p>Vehicle Limit: <strong>17 Seats Max per Taxi</strong> (Sorted systematically by regional proximity sequences)</p>
+        <p>Vehicle Limit: <strong>17 Seats Max per Taxi</strong> (Optimized by unsplit stop allocations)</p>
         <div id="manifestContainer"></div>
     </div>
 
@@ -120,7 +119,7 @@
                     <th>Phone</th>
                     <th>Classification</th>
                     <th>Structure</th>
-                    <th>Assigned Stop</th>
+                    <th>Stop</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -135,12 +134,12 @@
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const TAXI_CAPACITY = 17;
 
-    // The Expanded 4-Area Proximity Route Matrix Config
+    // Corrected Route Sequence Matrix Mapping
     const REGIONAL_ROUTES = {
         "Braam Route": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA"],
         "Auckland Park Route": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
         "CBD Route": ["DFC Bus Stop", "Focus 2", "Gateway", "Ghandi Square", "Maboneng", "Saratoga", "Shell Mooi Street", "Urban Circle", "The Fields", "Focus 1"],
-        "Parktown Route": ["Arteria", "Argyle", "EOH", "Junction", "Charlotte Maxeke", "Education Campus", "Knockando", "Stanley Avenue", "Yale", "Campus Central on Empire"]
+        "Parktown Route": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
     };
 
     let churchDb = null;
@@ -215,21 +214,16 @@
                 return;
             }
 
-            // LOOP THROUGH EACH INDEPENDENT AREA TO COMPILE LOGISTICS SEPARATELY
+            // INDEPENDENT GEOGRAPHIC ROUTING ENGINE WITH ATOMIC ASSIGNMENTS
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
-                
-                // 1. Filter out only the records belonging to this current area's landmarks
                 let areaRecords = records.filter(r => stopList.includes(r.pickup_stop));
-                
-                if (areaRecords.length === 0) continue; // Skip to next area if nobody signed up here
+                if (areaRecords.length === 0) continue; 
 
-                // Add area path header layout block
                 const areaHeaderDiv = document.createElement('div');
                 areaHeaderDiv.className = 'area-header';
                 areaHeaderDiv.innerText = `📍 ${areaName} Manifests`;
                 manifestContainer.appendChild(areaHeaderDiv);
 
-                // 2. Separate people by individual pickup locations within this region
                 let stopBuckets = {};
                 stopList.forEach(stop => stopBuckets[stop] = []);
                 areaRecords.forEach(p => {
@@ -241,21 +235,36 @@
                 let taxis = [];
                 let currentTaxi = { id: 1, passengers: [] };
 
-                // 3. Optimize passenger layout into vehicles sequentially along this specific region path
+                // ATOMIC ROUTING COMPILER LOGIC (NO FRACTIONAL STOP SPLITTING)
                 stopList.forEach(stop => {
-                    let individualsAtStop = stopBuckets[stop];
-                    while(individualsAtStop.length > 0) {
-                        let availableSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
-                        let boardingBatch = individualsAtStop.splice(0, availableSeats);
+                    let individualsAtStop = [...stopBuckets[stop]]; 
+                    if (individualsAtStop.length === 0) return;
 
-                        boardingBatch.forEach(passenger => {
-                            currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
-                        });
+                    let remainingSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
 
-                        if(currentTaxi.passengers.length === TAXI_CAPACITY) {
+                    // Overflow Guard: If entire stop headcount exceeds remaining vacancy, push stop to next clean vehicle
+                    if (individualsAtStop.length > remainingSeats) {
+                        if (currentTaxi.passengers.length > 0) {
                             taxis.push(currentTaxi);
                             currentTaxi = { id: taxis.length + 1, passengers: [] };
                         }
+                    }
+
+                    // Turnout Exception Handler: If a single stop has >17 people, fill whole taxis completely
+                    while (individualsAtStop.length > TAXI_CAPACITY) {
+                        let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
+                        fullTaxiBatch.forEach(passenger => {
+                            currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                        });
+                        taxis.push(currentTaxi);
+                        currentTaxi = { id: taxis.length + 1, passengers: [] };
+                    }
+
+                    // Safe Assignment: Put remaining group smoothly into current vehicle
+                    if (individualsAtStop.length > 0) {
+                        individualsAtStop.forEach(passenger => {
+                            currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                        });
                     }
                 });
 
@@ -263,7 +272,7 @@
                     taxis.push(currentTaxi);
                 }
 
-                // 4. Render the optimized vehicles out for this area section
+                // Render optimized layouts
                 taxis.forEach(taxi => {
                     const div = document.createElement('div');
                     div.className = 'taxi-card';
