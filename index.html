@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
+    <!-- Include Supabase Core Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -121,8 +122,10 @@
 
 <div class="container">
 
+    <!-- ERROR MESSENGER HOLDER -->
     <div id="globalErrorBox" class="error-box"></div>
 
+    <!-- SCREEN 1: THE SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
         <div class="debt-warning">
@@ -172,6 +175,7 @@
         </form>
     </div>
 
+    <!-- SCREEN 2: THE VISUAL CONFIRMATION SCREEN -->
     <div id="confirmationScreen" class="card">
         <div class="success-banner">
             🎉 SEAT RESERVED SUCCESSFULLY!<br>
@@ -193,17 +197,21 @@
         <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
     </div>
 
+    <!-- SYSTEM CONTROL GATE -->
     <div style="text-align: center; margin-top: 40px; margin-bottom: 40px;">
         <button class="toggle-admin-btn" onclick="toggleAdminView()">⚙️ Open Admin Control Dashboard</button>
     </div>
 
+    <!-- ADMIN ANALYSIS LAYOUT -->
     <div id="adminSection">
+        <!-- Live Taxis -->
         <div class="card">
             <h2>🚖 Sunday Compiled Taxi Rosters</h2>
-            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Optimized by proximity sequence: Argyle → Junction → Arteria → Education → EOH → Knockando)</p>
+            <p>Vehicle Limit: <strong>17 Seats Max</strong> (Sorted sequentially by route proximity: Argyle → Junction → Arteria → Education → EOH → Knockando)</p>
             <div id="manifestContainer"></div>
         </div>
 
+        <!-- Raw List Spreadsheet Daily Tracker -->
         <div class="card" style="max-width: 100%; overflow-x: auto;">
             <h2>📊 Live Member Database (Daily Checker Tracker)</h2>
             <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
@@ -218,7 +226,8 @@
                     </tr>
                 </thead>
                 <tbody id="rawDataTableBody">
-                    </tbody>
+                    <!-- Loaded dynamically via database calls -->
+                </tbody>
             </table>
         </div>
     </div>
@@ -226,19 +235,18 @@
 </div>
 
 <script>
-    // FIXED: Extracted the base domain URL as required by the library architecture
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
 
-    let supabase = null;
+    let supabaseClient = null;
     try {
-        supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // FIXED: Using lowercase window.supabase instantiation to resolve CDN startup crash
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch(err) {
         showError("Initialization Error: " + err.message);
     }
 
     const TAXI_CAPACITY = 17;
-    // Stops sorted in sequential route order
     const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
     function showError(msg) {
@@ -248,7 +256,6 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Handle user inputs
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const btn = document.getElementById('submitBtn');
@@ -264,15 +271,13 @@
         };
 
         try {
-            // Write directly to your real cloud system table
-            const { error } = await supabase.from('church_signups').insert([dataPayload]);
+            const { error } = await supabaseClient.from('church_signups').insert([dataPayload]);
             
             if (error) {
-                showError("Database Rejection: " + error.message + " (Check if you executed Step 1 SQL script).");
+                showError("Database Rejection: " + error.message + " (Double check if you completed Step 2).");
                 btn.innerText = "Confirm My Seat & Agree to R40";
                 btn.disabled = false;
             } else {
-                // Generate Reference and swap to the Confirmation Screen
                 document.getElementById('paymentRef').innerText = `${dataPayload.name.replace(/\s+/g, '').toUpperCase()}SUN`;
                 document.getElementById('bookingScreen').style.display = 'none';
                 document.getElementById('confirmationScreen').style.display = 'block';
@@ -284,10 +289,9 @@
         }
     });
 
-    // Gather data from the cloud database and process logistics
     async function fetchAndCompileLogistics() {
         try {
-            const { data: records, error } = await supabase
+            const { data: records, error } = await supabaseClient
                 .from('church_signups')
                 .select('*')
                 .order('created_at', { ascending: true });
@@ -297,7 +301,6 @@
                 return;
             }
 
-            // A. Update Spreadsheet Grid Display
             document.getElementById('totalCount').innerText = records.length;
             const tbody = document.getElementById('rawDataTableBody');
             tbody.innerHTML = '';
@@ -318,7 +321,6 @@
                 });
             }
 
-            // B. Run Optimization Algorithm into 17-Seat Taxis
             const manifestContainer = document.getElementById('manifestContainer');
             manifestContainer.innerHTML = '';
 
@@ -327,7 +329,6 @@
                 return;
             }
 
-            // Bucket people by stops
             let stopBuckets = {};
             STOP_SEQUENCE.forEach(stop => stopBuckets[stop] = []);
             records.forEach(p => {
@@ -339,7 +340,6 @@
             let taxis = [];
             let currentTaxi = { id: 1, passengers: [] };
 
-            // Sequential consolidation algorithm
             STOP_SEQUENCE.forEach(stop => {
                 let individualsAtStop = stopBuckets[stop];
                 while(individualsAtStop.length > 0) {
@@ -361,7 +361,6 @@
                 taxis.push(currentTaxi);
             }
 
-            // Generate Manifest Render UI
             taxis.forEach(taxi => {
                 const div = document.createElement('div');
                 div.className = 'taxi-card';
@@ -389,7 +388,6 @@
         }
     }
 
-    // Toggle View Control Function
     function toggleAdminView() {
         const panel = document.getElementById('adminSection');
         if(panel.style.display === 'block') {
