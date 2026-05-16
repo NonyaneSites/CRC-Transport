@@ -21,7 +21,7 @@
             --limbo-bg: #fff1f2;
             --limbo-border: #fecdd3;
             --limbo-text: #9f1239;
-            --warning-bg: #fef3c7;
+            --warning-bg: #fffbeb;
             --warning-text: #92400e;
             --warning-border: #fcd34d;
         }
@@ -149,7 +149,7 @@
             line-height: 1.4;
         }
         .cross-rider-tag {
-            background: var(--warning-bg);
+            background: #fef3c7;
             color: var(--warning-text);
             border: 1px solid var(--warning-border);
             font-size: 0.75rem;
@@ -181,7 +181,7 @@
             font-size: 1rem;
         }
 
-        /* CUSTOM MODAL BACKDROP OVERLAYS */
+        /* CUSTOM MODAL OVERLAYS */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -226,7 +226,7 @@
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-        <p style="margin-bottom: 20px;">Total Master Database Count: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
+        <p style="margin-bottom: 20px;">Total Unique Sign-Ups: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
         
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
         <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
@@ -262,17 +262,15 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // FULL COMPREHENSIVE PATH ARRAY INTEGRATING EXACT HARMONIZED TEXT UPDATES
+    // MASTER CHRONOLOGICAL SEQUENCE PATHWAY ARRANGEMENT
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
         "Braam", "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
     ];
 
-    // DEFINITIONS APPLIED FOR BRAAM OVERRIDE CONSOLIDATION
     const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
-    // AREA INDEX DICTIONARY FOR THE SYSTEM ROUTE ALLOCATOR TITLE CHECKS
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
@@ -340,6 +338,7 @@
         }
     }
 
+    // Mathematical subset summation solver to locate perfect capacity fits internally per route region
     function findPerfectSubset(stopGroups, targetCapacity) {
         for (let i = 1; i < (1 << stopGroups.length); i++) {
             let sum = 0;
@@ -363,25 +362,34 @@
                 document.getElementById('diagnosticStatus').innerHTML = "🚨 Database Error: " + error.message;
                 return;
             }
-            document.getElementById('diagnosticStatus').className = "status-good";
-            document.getElementById('diagnosticStatus').innerHTML = "🟢 Cloud synchronization verified. Data is live.";
-            document.getElementById('totalCount').innerText = records.length;
+
+            // PASS 0: AUTOMATIC REAL-TIME DEDUPLICATION FILTER (Filters by lowercase trimmed fullName)
+            let uniqueSeenNames = new Set();
+            let deduplicatedRecords = [];
+            records.forEach(r => {
+                let cleanedNameKey = r.name ? r.name.trim().toLowerCase() : "";
+                if (cleanedNameKey && !uniqueSeenNames.has(cleanedNameKey)) {
+                    uniqueSeenNames.add(cleanedNameKey);
+                    deduplicatedRecords.push(r);
+                }
+            });
+
+            document.getElementById('totalCount').innerText = deduplicatedRecords.length;
 
             const manifestContainer = document.getElementById('manifestContainer');
             const limboSectionContainer = document.getElementById('limboSectionContainer');
             manifestContainer.innerHTML = '';
             limboSectionContainer.innerHTML = '';
 
-            if(records.length === 0) {
-                manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No entries found.</p>';
+            if(deduplicatedRecords.length === 0) {
+                manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
                 return;
             }
 
-            // ROBUST DATA NORMALIZATION NORMALIZATION PIPELINE WITH CASE SANITIZING SAFEGUARDS
-            let workingPool = records.map(r => {
+            // STRING HARMONIZATION PIPELINE
+            let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
-                // Historical string compatibility corrections to clear database data legacy drops
                 if (dbStopRaw.toLowerCase() === "ghandi" || dbStopRaw.toLowerCase() === "ghandi square") dbStopRaw = "Ghandi Square";
                 if (dbStopRaw.toLowerCase() === "education" || dbStopRaw.toLowerCase() === "education campus") dbStopRaw = "Education Campus";
                 if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
@@ -392,7 +400,6 @@
                     displayStop = "Braam";
                 }
 
-                // Match up route area parameters safely based on the sequence index configurations
                 let mappedArea = "Unknown Route";
                 for (let [stopKey, areaValue] of Object.entries(AREA_MAPPING)) {
                     if (stopKey.toLowerCase() === displayStop.toLowerCase()) {
@@ -401,13 +408,12 @@
                         break;
                     }
                 }
-
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
             let finalizedTaxis = [];
 
-            // PASS 1: IMMEDIATE ISOLATION OF STOPS GREATER THAN OR EQUAL TO 17
+            // PASS 1: ISOLATE SINGLE CHECKPOINTS EXCEEDING CAPACITY LIMITS (>=17)
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -417,7 +423,7 @@
                 }
             });
 
-            // PASS 2: REGIONAL KNAPSACK MATCH ENGINE (collects exact local 17 combinations)
+            // PASS 2: INTRA-AREA COHESION MATCHING (Locates groups inside one area that fit perfectly into a 17-seater)
             let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
             uniqueAreas.forEach(areaName => {
                 let perfectMatchFound = true;
@@ -442,7 +448,16 @@
                 }
             });
 
-            // PASS 3: PRIORITY-CHECK KNAPSACK SEQUENTIAL LOADER FOR UNDER-CAPACITY STOPS
+            // PASS 3: STANDALONE AREA SURVIVAL CHECK (If remaining area passengers totals 14-17, keep them together)
+            uniqueAreas.forEach(areaName => {
+                let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
+                if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
+                    remainingAreaRiders.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: remainingAreaRiders });
+                }
+            });
+
+            // PASS 4: GEOGRAPHICALLY CHRONOLOGICAL CROSS-POOL FILLER FOR REMAINING BACKLOGS
             let globalLeftoverStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
@@ -487,7 +502,7 @@
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
 
-            // PHASE 4: ACCORDION INTERFACE DESIGN STRUCTURING OUTPUT RENDER
+            // PHASE 5: INTERFACE ACCORDION MANIFEST RENDERER
             let globalTaxiCounter = 1;
 
             finalizedTaxis.forEach(taxi => {
@@ -551,7 +566,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: OUTPUT COLLAPSIBLE UNASSIGNED LIMBO FIELD
+            // PHASE 6: LIMBO FIELD DISPLAY
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
