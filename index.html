@@ -281,16 +281,16 @@
     const TAXI_CAPACITY = 17;
     const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
 
-    let supabase = null;
+    let churchDb = null; // FIXED: Renamed variable to avoid naming collisions with global window.supabase
     const diagnostic = document.getElementById('diagnosticStatus');
 
     // 1. Core Startup Verification
     try {
-        if (typeof Supabase === 'undefined') {
+        if (typeof supabase === 'undefined') { 
             diagnostic.className = "status-bad";
             diagnostic.innerHTML = "🚨 STARTUP ERROR: The Supabase library script is blocked by an ad-blocker, Brave shield, or firewall rule.";
         } else {
-            supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
             diagnostic.innerHTML = "✅ Database Driver Loaded. Checking Cloud Sync...";
             verifyCloudConnection();
         }
@@ -301,7 +301,7 @@
 
     async function verifyCloudConnection() {
         try {
-            const { data, error } = await supabase.from('church_signups').select('id').limit(1);
+            const { data, error } = await churchDb.from('church_signups').select('id').limit(1); 
             if(error) {
                 diagnostic.className = "status-bad";
                 diagnostic.innerHTML = "🚨 CLOUD SYNC FAILED:<br>" + error.message + "<br><br>👉 This means your Supabase Table hasn't been set up yet. Go back to Step 1 in your previous message and run the SQL code inside your Supabase dashboard SQL editor.";
@@ -348,7 +348,7 @@
         };
 
         try {
-            const { error } = await supabase.from('church_signups').insert([dataPayload]);
+            const { error } = await churchDb.from('church_signups').insert([dataPayload]); 
             
             if (error) {
                 alert("❌ DATABASE REJECTION:\n" + error.message);
@@ -369,7 +369,7 @@
     // 4. Admin Management Dashboard Engine
     async function fetchAndCompileLogistics() {
         try {
-            const { data: records, error } = await supabase
+            const { data: records, error } = await churchDb 
                 .from('church_signups')
                 .select('*')
                 .order('created_at', { ascending: true });
@@ -470,7 +470,7 @@
     async function deletePassenger(id, name) {
         if (confirm(`Are you sure you want to completely remove ${name} from the transport list?`)) {
             try {
-                const { error } = await supabase.from('church_signups').delete().eq('id', id);
+                const { error } = await churchDb.from('church_signups').delete().eq('id', id); 
                 if (error) alert("Could not delete from database: " + error.message);
                 else fetchAndCompileLogistics();
             } catch(err) {
@@ -479,7 +479,7 @@
         }
     }
 
-    // Direct Event Binding to avoid parsing lockouts
+    // Direct Event Binding
     document.getElementById('adminGateBtn').addEventListener('click', function() {
         const panel = document.getElementById('adminSection');
         if(panel.style.display === 'block') {
