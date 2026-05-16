@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
+    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
+    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -178,17 +180,49 @@
             cursor: pointer;
             font-size: 1rem;
         }
+
+        /* CUSTOM MODAL BACKDROP CSS OVERLAYS */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            box-sizing: border-box;
+        }
+        .modal-card {
+            background: white;
+            max-width: 440px;
+            margin: 15% auto;
+            padding: 28px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-top: 10px;
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
 
+    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
+    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -200,8 +234,25 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
+    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
+</div>
+
+<!-- SECURITY MODAL DIALOG CONTAINER PORTAL -->
+<div id="customSecurityModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3 style="margin-top:0; color:#0f172a;">🔒 Security Verification</h3>
+        <p style="margin: 0; font-size:0.95rem; color:#475569;">
+            To completely remove <strong id="targetPassengerNameText">Passenger</strong> from the live cloud database, please verify your administrative clearance.
+        </p>
+        <input type="password" id="modalPasswordInputField" class="modal-input" placeholder="Enter administrative password">
+        <div id="modalErrorMessageBox" style="color:var(--error); font-size: 0.85rem; font-weight: bold; display: none; margin-bottom: 12px;">❌ Incorrect Password. Access Denied.</div>
+        <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 15px;">
+            <button class="refresh-btn" style="background:#64748b; padding:10px 16px;" onclick="closeSecurityModalGate()">Cancel</button>
+            <button class="refresh-btn" style="padding:10px 16px;" onclick="executeSecureCloudDeletion()">Verify & Remove</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -211,27 +262,37 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    const REGIONAL_ROUTES = {
-        "Braam Route": ["Braam"],
-        "Auckland Park Route": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
-        "CBD Route": ["DFC Bus Stop", "Focus 2", "Gateway", "Ghandi Square", "Maboneng", "Saratoga", "Shell Mooi Street", "Urban Circle", "The Fields", "Focus 1"],
-        "Parktown Route": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
-    };
+    // THE 27-STEP SYSTEM ROUTE SEQN ARRAYS (INCORPORATING CONDITIONALS FOR EDUCATION + ARTERIA SWAP)
+    const MASTER_ROUTE_SEQUENCE = [
+        "Ghandi", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
+        "Campus Central on Empire", "Argyle", "Junction", "Education", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
+        "Braam", "Yale", "Stanley Avenue", "UJ bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonalds"
+    ];
 
+    // RAW SELECTION OVERRIDES FOR INLINE NORMALIZATION MAPPINGS
     const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
+    // AREA CLASSIFICATION MATRIX FOR MAJORITY TITLE CHECKS
+    const AREA_MAPPING = {
+        "Ghandi": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
+        "Braam": "Braam Route",
+        "UJ bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonalds": "Auckland Park Route"
+    };
+
     let churchDb = null;
-    const diagnostic = document.getElementById('diagnosticStatus');
+    let pendingDeletionId = null;
+    let pendingDeletionName = null;
 
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            diagnostic.innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
+            document.getElementById('diagnosticStatus').innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
             fetchAndCompileLogistics();
             calculateUpcomingSunday();
         } catch(err) {
-            diagnostic.className = "status-bad";
-            diagnostic.innerHTML = "🚨 Connection Error: " + err.message;
+            document.getElementById('diagnosticStatus').className = "status-bad";
+            document.getElementById('diagnosticStatus').innerHTML = "🚨 Connection Error: " + err.message;
         }
     }
 
@@ -247,11 +308,9 @@
         });
     }
 
-    // Toggle function for Taxis accordion
     function toggleTaxiView(globalId) {
         const targetContentBlock = document.getElementById(`taxi-content-${globalId}`);
         const targetBadge = document.getElementById(`taxi-badge-${globalId}`);
-        
         if (targetContentBlock.style.display === "block") {
             targetContentBlock.style.display = "none";
             targetBadge.innerText = "▼ Show List";
@@ -265,11 +324,9 @@
         }
     }
 
-    // Toggle function for Limbo accordion
     function toggleLimboView() {
         const targetContentBlock = document.getElementById('limbo-content-block');
         const targetBadge = document.getElementById('limbo-toggle-badge');
-        
         if (targetContentBlock.style.display === "block") {
             targetContentBlock.style.display = "none";
             targetBadge.innerText = "▼ Show List";
@@ -283,7 +340,7 @@
         }
     }
 
-    function findPerfectAreaSubset(stopGroups, targetCapacity) {
+    function findPerfectSubset(stopGroups, targetCapacity) {
         for (let i = 1; i < (1 << stopGroups.length); i++) {
             let sum = 0;
             let subset = [];
@@ -300,19 +357,14 @@
 
     async function fetchAndCompileLogistics() {
         try {
-            const { data: records, error } = await churchDb
-                .from('church_signups')
-                .select('*')
-                .order('created_at', { ascending: true });
-
+            const { data: records, error } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
             if (error) {
-                diagnostic.className = "status-bad";
-                diagnostic.innerHTML = "🚨 Database Error: " + error.message;
+                document.getElementById('diagnosticStatus').className = "status-bad";
+                document.getElementById('diagnosticStatus').innerHTML = "🚨 Database Error: " + error.message;
                 return;
             }
-
-            diagnostic.className = "status-good";
-            diagnostic.innerHTML = "🟢 Cloud synchronization verified. Data is live.";
+            document.getElementById('diagnosticStatus').className = "status-good";
+            document.getElementById('diagnosticStatus').innerHTML = "🟢 Cloud synchronization verified. Data is live.";
             document.getElementById('totalCount').innerText = records.length;
 
             const manifestContainer = document.getElementById('manifestContainer');
@@ -321,138 +373,103 @@
             limboSectionContainer.innerHTML = '';
 
             if(records.length === 0) {
-                manifestContainer.innerHTML = '<p style="text-align:center; padding: 20px; color:#94a3b8;">No passenger records active.</p>';
+                manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No entries found.</p>';
                 return;
             }
 
-            // Remap Braam locations immediately
+            // NORMALIZATION PIPELINE RUNTIME EXECUTION
             let workingPool = records.map(r => {
-                let areaName = "Unknown Route";
                 let displayStop = r.pickup_stop;
-                
                 if (EXCLUSIVE_BRAAM_STOPS.includes(r.pickup_stop)) {
-                    areaName = "Braam Route";
-                    displayStop = "Braam"; 
-                } else {
-                    for (let [aKey, sList] of Object.entries(REGIONAL_ROUTES)) {
-                        if (sList.includes(r.pickup_stop)) { areaName = aKey; break; }
-                    }
+                    displayStop = "Braam";
                 }
-                return { ...r, assigned: false, sourceArea: areaName, displayStop: displayStop };
+                let mappedArea = AREA_MAPPING[displayStop] || "Unknown Route";
+                return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACTION OF PURE NATIVE MULTIPLES >= 17
-            for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
-                stopList.forEach(sName => {
-                    let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-                    while (matchingRiders.length >= TAXI_CAPACITY) {
-                        let fullBatch = matchingRiders.splice(0, TAXI_CAPACITY);
-                        fullBatch.forEach(p => p.assigned = true);
-                        finalizedTaxis.push({ passengers: fullBatch });
-                    }
-                });
-            }
+            // PASS 1: EXTRACT WHOLE BLOCKS >= 17 FOR INDIVIDUAL STOPS
+            MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
+                while (matchingRiders.length >= TAXI_CAPACITY) {
+                    let fullBatch = matchingRiders.splice(0, TAXI_CAPACITY);
+                    fullBatch.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: fullBatch });
+                }
+            });
 
-            // PASS 2: COMBINATORIAL NATIVE MATCH ENGINE (packs full 17s internally per area)
-            for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
+            // PASS 2: COMBINATORIAL KNAPSACK SUBSET FILLER (packs localized exact 17 fits seamlessly)
+            let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
+            uniqueAreas.forEach(areaName => {
                 let perfectMatchFound = true;
                 while (perfectMatchFound) {
-                    let remainingUnassignedAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
-                    
-                    let activeAreaStops = [];
-                    stopList.forEach(sName => {
-                        let stopRiders = remainingUnassignedAreaRiders.filter(p => p.displayStop === sName);
-                        if (stopRiders.length > 0) {
-                            activeAreaStops.push({ stopName: sName, passengers: stopRiders });
-                        }
+                    let unassignedAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
+                    let activeStops = [];
+                    MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                        let stopRiders = unassignedAreaRiders.filter(p => p.displayStop === sName);
+                        if (stopRiders.length > 0) activeStops.push({ stopName: sName, passengers: stopRiders });
                     });
 
-                    let targetSubset = findPerfectAreaSubset(activeAreaStops, TAXI_CAPACITY);
+                    let targetSubset = findPerfectSubset(activeStops, TAXI_CAPACITY);
                     if (targetSubset) {
                         let taxiContent = [];
                         targetSubset.forEach(group => {
-                            group.passengers.forEach(p => {
-                                p.assigned = true;
-                                taxiContent.push(p);
-                            });
+                            group.passengers.forEach(p => { p.assigned = true; taxiContent.push(p); });
                         });
                         finalizedTaxis.push({ passengers: taxiContent });
                     } else {
-                        perfectMatchFound = false; 
+                        perfectMatchFound = false;
                     }
                 }
-            }
+            });
 
-            // PASS 3: ADVANCED GLOBAL LEFTOVER BEST-FIT KNAPSACK ENGINE
+            // PASS 3: GLOBAL ORDERED SELECTION COMPILER
             let globalLeftoverStops = [];
-            for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
-                stopList.forEach(sName => {
-                    let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-                    if (unassignedRiders.length > 0) {
-                        globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
-                    }
-                });
-            }
+            MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
+                if (unassignedRiders.length > 0) globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
+            });
 
-            // Run priority packing protocols on global leftovers
             while (globalLeftoverStops.length > 0) {
-                let currentConsolidatedTaxi = { passengers: [] };
-                
-                // Seed the taxi with the first available chronological group block
+                let currentTaxi = { passengers: [] };
                 let seedGroup = globalLeftoverStops.shift();
-                currentConsolidatedTaxi.passengers.push(...seedGroup.passengers);
+                currentTaxi.passengers.push(...seedGroup.passengers);
 
-                // Run strict priority-check loop until vehicle is filled to 17
-                while (currentConsolidatedTaxi.passengers.length < TAXI_CAPACITY && globalLeftoverStops.length > 0) {
-                    let openSeats = TAXI_CAPACITY - currentConsolidatedTaxi.passengers.length;
-
-                    // PRIORITY 1: Search the entire city backlog for a perfect unbroken headcount match
+                while (currentTaxi.passengers.length < TAXI_CAPACITY && globalLeftoverStops.length > 0) {
+                    let openSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
                     let matchIndex = globalLeftoverStops.findIndex(g => g.passengers.length === openSeats);
 
-                    // PRIORITY 2: If no perfect match, search for the LARGEST whole group that fits unbroken
                     if (matchIndex === -1) {
-                        let validWholeFits = globalLeftoverStops
-                            .map((g, idx) => ({ g, idx }))
-                            .filter(item => item.g.passengers.length <= openSeats);
-                        
+                        let validWholeFits = globalLeftoverStops.map((g, idx) => ({ g, idx })).filter(item => item.g.passengers.length <= openSeats);
                         if (validWholeFits.length > 0) {
                             validWholeFits.sort((a, b) => b.g.passengers.length - a.g.passengers.length);
                             matchIndex = validWholeFits[0].idx;
                         }
                     }
 
-                    // PRIORITY 3: Absolute Last Resort—slice fractionally from the next sequential group
                     if (matchIndex === -1) {
                         let nextGroup = globalLeftoverStops[0];
                         let sliceBatch = nextGroup.passengers.splice(0, openSeats);
-                        currentConsolidatedTaxi.passengers.push(...sliceBatch);
-                        
-                        if (nextGroup.passengers.length === 0) {
-                            globalLeftoverStops.shift();
-                        }
+                        currentTaxi.passengers.push(...sliceBatch);
+                        if (nextGroup.passengers.length === 0) globalLeftoverStops.shift();
                     } else {
-                        // A group fits completely without splitting—pull them out of backlog array
                         let matchedGroup = globalLeftoverStops.splice(matchIndex, 1)[0];
-                        currentConsolidatedTaxi.passengers.push(...matchedGroup.passengers);
+                        currentTaxi.passengers.push(...matchedGroup.passengers);
                     }
                 }
 
-                // Verify capacity thresholds before committing vehicle
-                if (currentConsolidatedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    finalizedTaxis.push(currentConsolidatedTaxi);
+                if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    finalizedTaxis.push(currentTaxi);
                 } else {
-                    // Fail bounds check -> De-allocate passengers to trigger Limbo dump block
-                    currentConsolidatedTaxi.passengers.forEach(p => p.assigned = false);
+                    currentTaxi.passengers.forEach(p => p.assigned = false);
                 }
             }
 
-            // Sync structural parameters
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
 
-            // PHASE 4: RENDER COMPACT NOTES ACCORDIONS WITH MAJORITY MANIFEST TITLES
+            // PHASE 4: OUTPUT LAYOUT BLOCKS BUILDER
             let globalTaxiCounter = 1;
 
             finalizedTaxis.forEach(taxi => {
@@ -460,76 +477,54 @@
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
-                // Runtime Calculation of Majority Location Representation
+                // MAJORITY CALCULATION RULE FOR TITLE MANIFEST ALLOCATIONS
                 let areaTallyMap = {};
-                taxi.passengers.forEach(p => {
-                    areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1;
-                });
+                taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
-                let dynamicRouteHeaderTitle = `${majorityArea} Manifest`;
 
-                // Compute route summaries
                 let countSummaryMap = {};
                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
                 let routePlanStrings = [];
-                for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
-                    stopList.forEach(sName => {
-                        if (countSummaryMap[sName]) {
-                            routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
-                        }
-                    });
-                }
+                MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                    if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
+                });
 
                 let tableRowsHtml = '';
                 let passengerIndexCounter = 1;
 
-                // Sort table rows chronologically by route alignment mapping configurations
-                for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
-                    stopList.forEach(sName => {
-                        let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
-                        stopPassengers.forEach(r => {
-                            // MINORITY CROSS-ROUTE CONDITIONAL HIGHLIGHTING
-                            let isMinorityRider = r.sourceArea !== majorityArea;
-                            let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
-                            let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
+                MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                    let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
+                    stopPassengers.forEach(r => {
+                        let isMinorityRider = r.sourceArea !== majorityArea;
+                        let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
+                        let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
 
-                            tableRowsHtml += `
-                                <tr ${crossRowStyle}>
-                                    <td><strong>${passengerIndexCounter++}.</strong></td>
-                                    <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
-                                    <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
-                                    <td>${r.phone}</td>
-                                    <td>${r.visitor_status}</td>
-                                    <td>${r.structure}</td>
-                                    <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
-                                </tr>
-                            `;
-                        });
+                        tableRowsHtml += `
+                            <tr ${crossRowStyle}>
+                                <td><strong>${passengerIndexCounter++}.</strong></td>
+                                <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
+                                <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
+                                <td>${r.phone}</td>
+                                <td>${r.visitor_status}</td>
+                                <td>${r.structure}</td>
+                                <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
+                            </tr>
+                        `;
                     });
-                }
+                });
 
                 vehicleBlockElement.innerHTML = `
                     <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
-                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
+                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${majorityArea} Manifest <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
                     </div>
                     <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
-                        <div class="stop-summary-inline">
-                            <strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}
-                        </div>
-                        <div style="max-width: 100%; overflow-x: auto;">
+                        <div class="stop-summary-inline"><strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}</div>
+                        <div style="max-width:100%; overflow-x:auto;">
                             <table>
                                 <thead>
-                                    <tr>
-                                        <th style="width: 40px;">#</th>
-                                        <th>Stop Location</th>
-                                        <th>Passenger Name</th>
-                                        <th>Phone</th>
-                                        <th>Classification</th>
-                                        <th>Structure</th>
-                                        <th>Action</th>
-                                    </tr>
+                                    <tr><th style="width:40px;">#</th><th>Stop Location</th><th>Passenger Name</th><th>Phone</th><th>Classification</th><th>Structure</th><th>Action</th></tr>
                                 </thead>
                                 <tbody>${tableRowsHtml}</tbody>
                             </table>
@@ -539,24 +534,23 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: RENDER THE COLLAPSIBLE LIMBO BLOCK AT THE BOTTOM
+            // PHASE 5: RENDER COLLAPSIBLE LIMBO ACCORDION
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
-                
                 let limboRowsHtml = '';
                 let limboIndexCounter = 1;
 
                 globalLimboPassengers.forEach(r => {
                     limboRowsHtml += `
-                        <tr style="background: #fff1f2;">
+                        <tr style="background:#fff1f2;">
                             <td style="color:#9f1239;"><strong>${limboIndexCounter++}.</strong></td>
                             <td><span style="background:#ffe4e6; color:#9f1239; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
                             <td style="color:#9f1239;"><strong>${r.name}</strong> <span style="font-weight:normal; font-size:0.8rem; color:#64748b;">(${r.sourceArea.split(' ')[0]})</span></td>
                             <td style="color:#9f1239;">${r.phone}</td>
                             <td style="color:#9f1239;">${r.visitor_status}</td>
                             <td style="color:#9f1239;">${r.structure}</td>
-                            <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
+                            <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
                         </tr>
                     `;
                 });
@@ -567,21 +561,11 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">
-                            These stops are currently unassigned because their headcount cannot fit into open capacity slots, and their standalone numbers fall below the efficiency threshold required to operate an exclusive taxi route.
-                        </p>
-                        <div style="max-width: 100%; overflow-x: auto; background: white; border-radius:8px; border:1px solid #fecdd3;">
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers).</p>
+                        <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
-                                    <tr>
-                                        <th style="width: 40px;">#</th>
-                                        <th>Stop Location</th>
-                                        <th>Name</th>
-                                        <th>Phone</th>
-                                        <th>Classification</th>
-                                        <th>Structure</th>
-                                        <th>Action</th>
-                                    </tr>
+                                    <tr><th style="width:40px;">#</th><th>Stop Location</th><th>Name</th><th>Phone</th><th>Classification</th><th>Structure</th><th>Action</th></tr>
                                 </thead>
                                 <tbody>${limboRowsHtml}</tbody>
                             </table>
@@ -590,7 +574,6 @@
                 `;
                 limboSectionContainer.appendChild(limboDiv);
             }
-
         } catch(err) {
             alert("Exception parsing registers.");
             console.error(err);
@@ -599,47 +582,54 @@
 
     async function downloadExcelBackup() {
         try {
-            const { data: records, error } = await churchDb
-                .from('church_signups')
-                .select('name, phone, visitor_status, structure, pickup_stop, created_at')
-                .order('created_at', { ascending: true });
-
-            if (error) {
-                alert("Error pulling backup: " + error.message);
-                return;
-            }
-
+            const { data: records, error } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
+            if (error) { alert("Error pulling backup: " + error.message); return; }
             let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
             records.forEach(r => {
                 let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
                 csvContent += row + "\n";
             });
-
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
             link.setAttribute("download", `Church_Transport_Master_Archive_${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (err) {
-            alert("Failed to generate report: " + err.message);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        } catch (err) { alert("Failed to generate report: " + err.message); }
+    }
+
+    function openSecurityModalGate(passengerId, passengerName) {
+        pendingDeletionId = passengerId;
+        pendingDeletionName = passengerName;
+        document.getElementById('targetPassengerNameText').innerText = passengerName;
+        document.getElementById('modalPasswordInputField').value = "";
+        document.getElementById('modalErrorMessageBox').style.display = "none";
+        document.getElementById('customSecurityModal').style.display = "block";
+        document.getElementById('modalPasswordInputField').focus();
+    }
+
+    function closeSecurityModalGate() {
+        document.getElementById('customSecurityModal').style.display = "none";
+        pendingDeletionId = null; pendingDeletionName = null;
+    }
+
+    async function executeSecureCloudDeletion() {
+        const inputPasswordValue = document.getElementById('modalPasswordInputField').value;
+        if (inputPasswordValue === ADMIN_PASSWORD) {
+            document.getElementById('modalErrorMessageBox').style.display = "none";
+            document.getElementById('customSecurityModal').style.display = "none";
+            try {
+                const { error } = await churchDb.from('church_signups').delete().eq('id', pendingDeletionId);
+                if (error) alert("Database error: " + error.message); else fetchAndCompileLogistics();
+            } catch(dbErr) { alert("Network error: " + dbErr.message); }
+            pendingDeletionId = null; pendingDeletionName = null;
+        } else {
+            document.getElementById('modalErrorMessageBox').style.display = "block";
         }
     }
 
-    async function deletePassenger(id, name) {
-        let securityChallenge = prompt("🔒 Security Clearance Required:\nEnter Admin Password to complete removal:");
-        if (securityChallenge === null) return; 
-        if (securityChallenge === ADMIN_PASSWORD) {
-            if (confirm(`Are you sure you want to delete ${name}?`)) {
-                const { error } = await churchDb.from('church_signups').delete().eq('id', id);
-                if (error) alert("Deletion error: " + error.message);
-                else fetchAndCompileLogistics(); 
-            }
-        } else {
-            alert("❌ Incorrect Password.");
-        }
-    }
+    document.getElementById('modalPasswordInputField').addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') executeSecureCloudDeletion();
+    });
 
     initializeAdmin();
 </script>
