@@ -18,9 +18,9 @@
             --card: #ffffff;
             --text: #334155;
             --error: #dc2626;
-            --warning-bg: #fffbeb;
-            --warning-border: #fef08a;
-            --warning-text: #a16207;
+            --limbo-bg: #fff1f2;
+            --limbo-border: #fecdd3;
+            --limbo-text: #9f1239;
         }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -29,7 +29,7 @@
             margin: 0;
             padding: 15px;
         }
-        .container { max-width: 900px; margin: 0 auto; }
+        .container { max-width: 950px; margin: 0 auto; }
         .card {
             background: var(--card);
             padding: 24px;
@@ -67,7 +67,6 @@
             margin-bottom: 15px;
             font-size: 1.3rem;
             font-weight: bold;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .vehicle-block {
             background: var(--card);
@@ -76,7 +75,14 @@
             padding: 20px;
             margin-bottom: 25px;
             border-radius: 4px 12px 12px 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .limbo-block {
+            background: var(--limbo-bg);
+            border: 2px dashed var(--limbo-border);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            color: var(--limbo-text);
         }
         .vehicle-title {
             color: #065f46;
@@ -84,6 +90,7 @@
             font-size: 1.2rem;
             border-bottom: 2px dashed #cbd5e1;
             padding-bottom: 6px;
+            font-weight: bold;
         }
         .stop-summary-inline {
             background: #f1f5f9;
@@ -93,19 +100,8 @@
             margin-bottom: 15px;
             color: #475569;
         }
-        .reroute-alert {
-            display: inline-block;
-            background: var(--warning-bg);
-            color: var(--warning-text);
-            border: 1px solid var(--warning-border);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            margin-left: 5px;
-        }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; color: #334155; }
         th { background: #f8fafc; color: #475569; font-weight: 600; }
         .delete-btn {
             background: #fee2e2;
@@ -116,7 +112,6 @@
             cursor: pointer;
             font-weight: bold;
         }
-        .delete-btn:hover { background: #fca5a5; }
         .refresh-btn {
             background: var(--success);
             color: white;
@@ -125,7 +120,6 @@
             border-radius: 8px;
             font-weight: bold;
             cursor: pointer;
-            margin-bottom: 5px;
             font-size: 1rem;
         }
     </style>
@@ -139,16 +133,16 @@
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
+    <!-- THE REQUESTED LIMBO SECTION OUTLET -->
+    <div id="limboSectionContainer"></div>
+
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-        <p style="margin-bottom: 20px;">Total Confirmed Sign-ups Across All Routes: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
+        <p style="margin-bottom: 20px;">Total Master Database Count: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
         
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
         <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
-        <p style="font-size: 0.85rem; color:#64748b; margin-top:5px;">
-            Vehicles strictly enforce a <strong>minimum floor of 14 passengers</strong>. Any vehicle below 14 is automatically dissolved, and its passengers are redistributed across remaining capacity.
-        </p>
         
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
@@ -213,224 +207,202 @@
             document.getElementById('totalCount').innerText = records.length;
 
             const manifestContainer = document.getElementById('manifestContainer');
+            const limboSectionContainer = document.getElementById('limboSectionContainer');
             manifestContainer.innerHTML = '';
+            limboSectionContainer.innerHTML = '';
 
             if(records.length === 0) {
-                manifestContainer.innerHTML = '<p style="color:#94a3b8; text-align:center; padding: 20px;">No passenger signups found in the cloud database yet.</p>';
+                manifestContainer.innerHTML = '<p style="text-align:center; padding: 20px; color:#94a3b8;">No passenger records active.</p>';
                 return;
             }
 
-            // PHASE 1: STANDARD REGIONAL INITIAL GENERATION
-            let globalTaxis = [];
-            let globalVehicleCounter = 1;
+            let globalLimboPassengers = [];
 
+            // COMPILE INDEPENDENT ROUTE AREAS
             for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
                 let areaRecords = records.filter(r => stopList.includes(r.pickup_stop));
                 if (areaRecords.length === 0) continue; 
 
+                // Isolate records by stop lists
                 let stopBuckets = {};
                 stopList.forEach(stop => stopBuckets[stop] = []);
                 areaRecords.forEach(p => {
-                    if (stopBuckets[p.pickup_stop]) {
-                        stopBuckets[p.pickup_stop].push({...p, originalArea: areaName}); 
-                    }
+                    if (stopBuckets[p.pickup_stop]) stopBuckets[p.pickup_stop].push(p);
                 });
 
                 let areaTaxis = [];
-                let currentTaxi = { id: areaTaxis.length + 1, passengers: [] };
+                let backlogStops = [];
 
+                // PHASE 1: FILL EXTANT CAPACITY FIRST (FIRST-FIT WHOLE-GROUP APPROACH)
                 stopList.forEach(stop => {
-                    let individualsAtStop = [...stopBuckets[stop]]; 
+                    let individualsAtStop = [...stopBuckets[stop]];
                     if (individualsAtStop.length === 0) return;
 
-                    let remainingSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
-
-                    if (individualsAtStop.length > remainingSeats) {
-                        if (currentTaxi.passengers.length > 0) {
-                            areaTaxis.push(currentTaxi);
-                            currentTaxi = { id: areaTaxis.length + 1, passengers: [] };
-                        }
-                    }
-
+                    // Turnout Exception: If one stop has >17 people on its own, fill whole vehicles
                     while (individualsAtStop.length >= TAXI_CAPACITY) {
+                        let fullTaxi = { id: areaTaxis.length + 1, passengers: [] };
                         let fullTaxiBatch = individualsAtStop.splice(0, TAXI_CAPACITY);
-                        fullTaxiBatch.forEach(r => currentTaxi.passengers.push(r));
-                        areaTaxis.push(currentTaxi);
-                        currentTaxi = { id: areaTaxis.length + 1, passengers: [] };
+                        fullTaxiBatch.forEach(p => fullTaxi.passengers.push(p));
+                        areaTaxis.push(fullTaxi);
                     }
 
-                    if (individualsAtStop.length > 0) {
-                        individualsAtStop.forEach(r => currentTaxi.passengers.push(r));
-                    }
-                });
+                    let remainingGroupSize = individualsAtStop.length;
+                    if (remainingGroupSize === 0) return;
 
-                if(currentTaxi.passengers.length > 0) {
-                    areaTaxis.push(currentTaxi);
-                }
-
-                // Map local area vehicles into our global system array
-                areaTaxis.forEach(t => {
-                    globalTaxis.push({
-                        globalVehicleId: globalVehicleCounter++,
-                        primaryArea: areaName,
-                        passengers: t.passengers
-                    });
-                });
-            }
-
-            // PHASE 2: AUTOMATIC CAPACITY FLOOR OPTIMIZATION PASS
-            // Look for any vehicle running with fewer than 14 passengers
-            for (let i = 0; i < globalTaxis.length; i++) {
-                let lowTaxi = globalTaxis[i];
-                if (lowTaxi.passengers.length > 0 && lowTaxi.passengers.length < MIN_PASSENGER_FLOOR) {
-                    
-                    // Create a sandbox simulation to test if everyone can be redistributed cleanly
-                    let passengersToMove = [...lowTaxi.passengers];
-                    let simulationTaxis = globalTaxis.map(t => ({
-                        globalVehicleId: t.globalVehicleId,
-                        primaryArea: t.primaryArea,
-                        passengers: [...t.passengers]
-                    }));
-
-                    let allPassengersPlaced = true;
-
-                    for (let passenger of passengersToMove) {
-                        let dynamicHomeFound = false;
-
-                        // Priority 1: Search for space in vehicles operating within the SAME route area
-                        for (let simTaxi of simulationTaxis) {
-                            if (simTaxi.globalVehicleId !== lowTaxi.globalVehicleId && simTaxi.primaryArea === lowTaxi.primaryArea) {
-                                if ((TAXI_CAPACITY - simTaxi.passengers.length) >= 1) {
-                                    simTaxi.passengers.push(passenger);
-                                    dynamicHomeFound = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Priority 2: Exemption trigger—Search across completely DIFFERENT route vehicles
-                        if (!dynamicHomeFound) {
-                            for (let simTaxi of simulationTaxis) {
-                                if (simTaxi.globalVehicleId !== lowTaxi.globalVehicleId && simTaxi.primaryArea !== lowTaxi.primaryArea) {
-                                    if ((TAXI_CAPACITY - simTaxi.passengers.length) >= 1) {
-                                        // Tag passenger with a visual warning note for cross-area pickup coordination
-                                        passenger.crossAreaReroute = `Moved to ${simTaxi.primaryArea.split(' ')[0]}`;
-                                        simTaxi.passengers.push(passenger);
-                                        dynamicHomeFound = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!dynamicHomeFound) {
-                            allPassengersPlaced = false; 
+                    // Scan open vehicles to check if this whole group can fit into existing open seats
+                    let targetTaxi = null;
+                    for (let taxi of areaTaxis) {
+                        let seatsLeft = TAXI_CAPACITY - taxi.passengers.length;
+                        if (seatsLeft >= remainingGroupSize) {
+                            targetTaxi = taxi;
                             break; 
                         }
                     }
 
-                    // All-or-Nothing Commit: If everyone fits, apply the changes and dissolve the empty taxi
-                    if (allPassengersPlaced) {
-                        globalTaxis = simulationTaxis;
-                        globalTaxis.find(t => t.globalVehicleId === lowTaxi.globalVehicleId).passengers = [];
+                    if (targetTaxi) {
+                        individualsAtStop.forEach(p => targetTaxi.passengers.push(p));
+                    } else {
+                        // Hold group in backlog if it doesn't fit in open slots
+                        backlogStops.push(individualsAtStop);
                     }
-                }
-            }
+                });
 
-            // PHASE 3: RENDER THE OPTIMIZED DATA
-            for (const areaName of Object.keys(REGIONAL_ROUTES)) {
-                let areaVehicles = globalTaxis.filter(t => t.primaryArea === areaName && t.passengers.length > 0);
-                if (areaVehicles.length === 0) continue;
+                // PHASE 2: PROCESSING BACKLOG GROUPS WITH LIMBO CAPACITY CHECK
+                while (backlogStops.length > 0) {
+                    let testTaxiContent = [];
+                    let elementsToExtract = [];
 
-                const areaHeaderDiv = document.createElement('div');
-                areaHeaderDiv.className = 'area-header';
-                areaHeaderDiv.innerText = `📍 ${areaName} Vehicle Operations`;
-                manifestContainer.appendChild(areaHeaderDiv);
-
-                let areaStopOrder = REGIONAL_ROUTES[areaName];
-
-                areaVehicles.forEach((taxi, index) => {
-                    const vehicleDiv = document.createElement('div');
-                    vehicleDiv.className = 'vehicle-block';
-
-                    // Group headcounts for the driver route summary text
-                    let summaryCounts = {};
-                    taxi.passengers.forEach(p => {
-                        summaryCounts[p.pickup_stop] = (summaryCounts[p.pickup_stop] || 0) + 1;
-                    });
-
-                    let routePlanStrings = [];
-                    // Read native route stops sequentially
-                    areaStopOrder.forEach(sName => {
-                        if (summaryCounts[sName]) routePlanStrings.push(`${sName} (${summaryCounts[sName]} pax)`);
-                    });
-                    // Append any cross-route exception stops at the end
-                    for (let [sName, count] of Object.entries(summaryCounts)) {
-                        if (!areaStopOrder.includes(sName)) {
-                            routePlanStrings.push(`⚠️ ${sName} (${count} cross-pax)`);
+                    // Try combining remaining backlog items to reach the utilization floor of 14
+                    for (let i = 0; i < backlogStops.length; i++) {
+                        let currentGroup = backlogStops[i];
+                        if (testTaxiContent.length + currentGroup.length <= TAXI_CAPACITY) {
+                            testTaxiContent.push(...currentGroup);
+                            elementsToExtract.push(i);
                         }
                     }
 
-                    // Build rows: group native passengers by route sequence, then append cross-route riders
-                    let tableRowsHtml = '';
-                    
-                    // Native riders
-                    areaStopOrder.forEach(sName => {
-                        let stopPassengers = taxi.passengers.filter(p => p.pickup_stop === sName);
-                        stopPassengers.forEach(r => {
-                            tableRowsHtml += `
-                                <tr>
-                                    <td><strong>${r.name}</strong></td>
-                                    <td>${r.phone}</td>
-                                    <td>${r.visitor_status}</td>
-                                    <td>${r.structure}</td>
-                                    <td><span style="background:#eff6ff; color:#1e40af; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
-                                    <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
-                                </tr>
-                            `;
+                    // Enforce the passenger floor requirement
+                    if (testTaxiContent.length >= MIN_PASSENGER_FLOOR) {
+                        // Create a valid vehicle if the utilization floor is met
+                        let newTaxi = { id: areaTaxis.length + 1, passengers: testTaxiContent };
+                        areaTaxis.push(newTaxi);
+                        
+                        // Remove assigned items from the backlog array
+                        backlogStops = backlogStops.filter((_, idx) => !elementsToExtract.includes(idx));
+                    } else {
+                        // If remaining groups cannot meet the utilization floor, send them to the Limbo array
+                        backlogStops.forEach(group => {
+                            globalLimboPassengers.push(...group);
                         });
-                    });
+                        break; 
+                    }
+                }
 
-                    // Cross-route riders
-                    let crossRiders = taxi.passengers.filter(p => !areaStopOrder.includes(p.pickup_stop));
-                    crossRiders.forEach(r => {
-                        tableRowsHtml += `
-                            <tr style="background-color: #fafafa;">
-                                <td><strong>${r.name}</strong> <span class="reroute-alert">Cross-Area Rider</span></td>
-                                <td>${r.phone}</td>
-                                <td>${r.visitor_status}</td>
-                                <td>${r.structure}</td>
-                                <td><span style="background:#fff1f2; color:#9f1239; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop} (${r.originalArea.split(' ')[0]})</span></td>
-                                <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
-                            </tr>
-                        `;
-                    });
+                // PHASE 3: RENDER VALID VEHICLES
+                if (areaTaxis.length > 0) {
+                    const areaHeaderDiv = document.createElement('div');
+                    areaHeaderDiv.className = 'area-header';
+                    areaHeaderDiv.innerText = `📍 ${areaName} Active Manifests`;
+                    manifestContainer.appendChild(areaHeaderDiv);
 
-                    vehicleDiv.innerHTML = `
-                        <div class="vehicle-title">🚍 Vehicle #${index + 1} — Total Loading: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Occupied</div>
-                        <div class="stop-summary-inline">
-                            <strong>Driver Route Manifest:</strong> ${routePlanStrings.join(' ➔ ')}
-                        </div>
-                        <div style="max-width: 100%; overflow-x: auto;">
-                            <table>
-                                <thead>
+                    areaTaxis.forEach(taxi => {
+                        const vehicleDiv = document.createElement('div');
+                        vehicleDiv.className = 'vehicle-block';
+
+                        let countsByStop = {};
+                        taxi.passengers.forEach(p => {
+                            countsByStop[p.pickup_stop] = (countsByStop[p.pickup_stop] || 0) + 1;
+                        });
+                        
+                        let routePlanStrings = [];
+                        stopList.forEach(sName => {
+                            if (countsByStop[sName]) routePlanStrings.push(`${sName} (${countsByStop[sName]} people)`);
+                        });
+
+                        let tableRowsHtml = '';
+                        stopList.forEach(sName => {
+                            let stopPassengers = taxi.passengers.filter(p => p.pickup_stop === sName);
+                            stopPassengers.forEach(r => {
+                                tableRowsHtml += `
                                     <tr>
-                                        <th>Passenger Name</th>
-                                        <th>Phone</th>
-                                        <th>Classification</th>
-                                        <th>Structure</th>
-                                        <th>Stop Location</th>
-                                        <th>Action</th>
+                                        <td><strong>${r.name}</strong></td>
+                                        <td>${r.phone}</td>
+                                        <td>${r.visitor_status}</td>
+                                        <td>${r.structure}</td>
+                                        <td><span style="background:#eff6ff; color:#1e40af; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
+                                        <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    ${tableRowsHtml}
-                                </tbody>
-                            </table>
-                        </div>
+                                `;
+                            });
+                        });
+
+                        vehicleDiv.innerHTML = `
+                            <div class="vehicle-title">🚍 Vehicle #${taxi.id} — Total Loading: ${taxi.passengers.length}/${TAXI_CAPACITY} Seats Filled</div>
+                            <div class="stop-summary-inline">
+                                <strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}
+                            </div>
+                            <div style="max-width: 100%; overflow-x: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Phone</th>
+                                            <th>Classification</th>
+                                            <th>Structure</th>
+                                            <th>Stop</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${tableRowsHtml}</tbody>
+                                </table>
+                            </div>
+                        `;
+                        manifestContainer.appendChild(vehicleDiv);
+                    });
+                }
+            }
+
+            // PHASE 4: RENDER THE LIMBO BLOCK (IF ANY PASSENGERS ARE UNASSIGNED)
+            if (globalLimboPassengers.length > 0) {
+                const limboDiv = document.createElement('div');
+                limboDiv.className = 'limbo-block card';
+                
+                let limboRowsHtml = '';
+                globalLimboPassengers.forEach(r => {
+                    limboRowsHtml += `
+                        <tr style="background: #fff1f2;">
+                            <td style="color:#9f1239;"><strong>${r.name}</strong></td>
+                            <td style="color:#9f1239;">${r.phone}</td>
+                            <td style="color:#9f1239;">${r.visitor_status}</td>
+                            <td style="color:#9f1239;">${r.structure}</td>
+                            <td><span style="background:#ffe4e6; color:#9f1239; padding:3px 6px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.pickup_stop}</span></td>
+                            <td><button class="delete-btn" onclick="deletePassenger(${r.id}, '${r.name}')">❌ Remove</button></td>
+                        </tr>
                     `;
-                    manifestContainer.appendChild(vehicleDiv);
                 });
+
+                limboDiv.innerHTML = `
+                    <h3 style="color:#9f1239; margin-bottom: 5px;">⚠️ Unassigned Passengers (${globalLimboPassengers.length} in Limbo)</h3>
+                    <p style="font-size:0.85rem; margin-top:0; color:#475569;">
+                        These stops have been placed in limbo because their headcount cannot fit into any existing vehicle's open seats, and opening a new vehicle for them would result in an under-capacity taxi (fewer than 14 passengers).
+                    </p>
+                    <div style="max-width: 100%; overflow-x: auto; background: white; border-radius:8px; border:1px solid #fecdd3;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Phone</th>
+                                    <th>Classification</th>
+                                    <th>Structure</th>
+                                    <th>Stop Location</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>${limboRowsHtml}</tbody>
+                        </table>
+                    </div>
+                `;
+                limboSectionContainer.appendChild(limboDiv);
             }
 
         } catch(err) {
