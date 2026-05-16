@@ -22,7 +22,7 @@
             margin: 0;
             padding: 15px;
         }
-        .container { max-width: 750px; margin: 0 auto; }
+        .container { max-width: 800px; margin: 0 auto; }
         .card {
             background: var(--card);
             padding: 24px;
@@ -51,8 +51,18 @@
             font-size: 0.9rem;
             margin-bottom: 15px;
         }
+        .area-header {
+            background: #1e3a8a;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
         .taxi-card {
-            border-left: 5px solid var(--primary);
+            border-left: 5px solid var(--success);
             background: #f1f5f9;
             padding: 16px;
             margin-bottom: 15px;
@@ -86,22 +96,20 @@
 
 <div class="container">
 
-    <!-- Database Monitor Sync Verification -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
-    <!-- Taxi Manifest List Cards -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
+        <br>
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data</button>
-        <p>Vehicle Limit: <strong>17 Seats Max</strong> (Sorted sequentially by route proximity)</p>
+        <p>Vehicle Limit: <strong>17 Seats Max per Taxi</strong> (Sorted systematically by regional proximity sequences)</p>
         <div id="manifestContainer"></div>
     </div>
 
-    <!-- Active Grid Data Spreadsheet Tracker Layout -->
     <div class="card" style="max-width: 100%; overflow-x: auto;">
         <h2>📊 Live Passenger Database (Daily Checker Tracker)</h2>
         <p>Total Confirmed Registrations: <strong id="totalCount">0</strong></p>
@@ -112,7 +120,7 @@
                     <th>Phone</th>
                     <th>Classification</th>
                     <th>Structure</th>
-                    <th>Stop</th>
+                    <th>Assigned Stop</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -126,12 +134,18 @@
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const TAXI_CAPACITY = 17;
-    const STOP_SEQUENCE = ["Argyle", "Junction", "Arteria", "Education", "EOH", "Knockando"];
+
+    // The Expanded 4-Area Proximity Route Matrix Config
+    const REGIONAL_ROUTES = {
+        "Braam Route": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA"],
+        "Auckland Park Route": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
+        "CBD Route": ["DFC Bus Stop", "Focus 2", "Gateway", "Ghandi Square", "Maboneng", "Saratoga", "Shell Mooi Street", "Urban Circle", "The Fields", "Focus 1"],
+        "Parktown Route": ["Arteria", "Argyle", "EOH", "Junction", "Charlotte Maxeke", "Education Campus", "Knockando", "Stanley Avenue", "Yale", "Campus Central on Empire"]
+    };
 
     let churchDb = null;
     const diagnostic = document.getElementById('diagnosticStatus');
 
-    // Page initializes automatically on load without password intervention
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -201,61 +215,80 @@
                 return;
             }
 
-            let stopBuckets = {};
-            STOP_SEQUENCE.forEach(stop => stopBuckets[stop] = []);
-            records.forEach(p => {
-                if (stopBuckets[p.pickup_stop]) {
-                    stopBuckets[p.pickup_stop].push(`${p.name} (${p.structure})`);
-                }
-            });
+            // LOOP THROUGH EACH INDEPENDENT AREA TO COMPILE LOGISTICS SEPARATELY
+            for (const [areaName, stopList] of Object.entries(REGIONAL_ROUTES)) {
+                
+                // 1. Filter out only the records belonging to this current area's landmarks
+                let areaRecords = records.filter(r => stopList.includes(r.pickup_stop));
+                
+                if (areaRecords.length === 0) continue; // Skip to next area if nobody signed up here
 
-            let taxis = [];
-            let currentTaxi = { id: 1, passengers: [] };
+                // Add area path header layout block
+                const areaHeaderDiv = document.createElement('div');
+                areaHeaderDiv.className = 'area-header';
+                areaHeaderDiv.innerText = `📍 ${areaName} Manifests`;
+                manifestContainer.appendChild(areaHeaderDiv);
 
-            STOP_SEQUENCE.forEach(stop => {
-                let individualsAtStop = stopBuckets[stop];
-                while(individualsAtStop.length > 0) {
-                    let availableSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    let boardingBatch = individualsAtStop.splice(0, availableSeats);
-
-                    boardingBatch.forEach(passenger => {
-                        currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
-                    });
-
-                    if(currentTaxi.passengers.length === TAXI_CAPACITY) {
-                        taxis.push(currentTaxi);
-                        currentTaxi = { id: taxis.length + 1, passengers: [] };
+                // 2. Separate people by individual pickup locations within this region
+                let stopBuckets = {};
+                stopList.forEach(stop => stopBuckets[stop] = []);
+                areaRecords.forEach(p => {
+                    if (stopBuckets[p.pickup_stop]) {
+                        stopBuckets[p.pickup_stop].push(`${p.name} (${p.structure})`);
                     }
-                }
-            });
-
-            if(currentTaxi.passengers.length > 0) {
-                taxis.push(currentTaxi);
-            }
-
-            taxis.forEach(taxi => {
-                const div = document.createElement('div');
-                div.className = 'taxi-card';
-                let structureByStop = {};
-                taxi.passengers.forEach(p => {
-                    if(!structureByStop[p.stopName]) structureByStop[p.stopName] = [];
-                    structureByStop[p.stopName].push(p.passengerDetails);
                 });
 
-                let stopBreakdownHtml = '';
-                for(let sName in structureByStop) {
-                    stopBreakdownHtml += `<div style="margin-top:6px;"><strong>📍 Stop ${sName} (${structureByStop[sName].length} people):</strong> ${structureByStop[sName].join(', ')}</div>`;
+                let taxis = [];
+                let currentTaxi = { id: 1, passengers: [] };
+
+                // 3. Optimize passenger layout into vehicles sequentially along this specific region path
+                stopList.forEach(stop => {
+                    let individualsAtStop = stopBuckets[stop];
+                    while(individualsAtStop.length > 0) {
+                        let availableSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
+                        let boardingBatch = individualsAtStop.splice(0, availableSeats);
+
+                        boardingBatch.forEach(passenger => {
+                            currentTaxi.passengers.push({ passengerDetails: passenger, stopName: stop });
+                        });
+
+                        if(currentTaxi.passengers.length === TAXI_CAPACITY) {
+                            taxis.push(currentTaxi);
+                            currentTaxi = { id: taxis.length + 1, passengers: [] };
+                        }
+                    }
+                });
+
+                if(currentTaxi.passengers.length > 0) {
+                    taxis.push(currentTaxi);
                 }
 
-                div.innerHTML = `
-                    <h3 style="color:#1e40af; margin:0 0 8px 0;">Taxi #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Occupied)</h3>
-                    ${stopBreakdownHtml}
-                `;
-                manifestContainer.appendChild(div);
-            });
+                // 4. Render the optimized vehicles out for this area section
+                taxis.forEach(taxi => {
+                    const div = document.createElement('div');
+                    div.className = 'taxi-card';
+                    let structureByStop = {};
+                    taxi.passengers.forEach(p => {
+                        if(!structureByStop[p.stopName]) structureByStop[p.stopName] = [];
+                        structureByStop[p.stopName].push(p.passengerDetails);
+                    });
+
+                    let stopBreakdownHtml = '';
+                    for(let sName in structureByStop) {
+                        stopBreakdownHtml += `<div style="margin-top:6px;"><strong>🔹 ${sName} (${structureByStop[sName].length} people):</strong> ${structureByStop[sName].join(', ')}</div>`;
+                    }
+
+                    div.innerHTML = `
+                        <h3 style="color:#065f46; margin:0 0 8px 0;">Vehicle #${taxi.id} — (${taxi.passengers.length}/${TAXI_CAPACITY} Seats Occupied)</h3>
+                        ${stopBreakdownHtml}
+                    `;
+                    manifestContainer.appendChild(div);
+                });
+            }
 
         } catch(err) {
             alert("Exception parsing registers.");
+            console.error(err);
         }
     }
 
@@ -267,7 +300,6 @@
         }
     }
 
-    // Execute app load instantly on runtime
     initializeAdmin();
 </script>
 </body>
