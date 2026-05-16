@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛪</text></svg>">
+    
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -184,7 +187,6 @@
 
     const churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Chained Stop Data Matrix mapping landmarks to areas
     const STOPS_DATA = {
         "Braam": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA"],
         "Auckland Park": ["APK McDonald’s", "Gate 2", "Gate 4", "Laborie", "Richmond", "UJ Bunting", "Westdene Engen"],
@@ -192,7 +194,6 @@
         "Parktown": ["Campus Central Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"]
     };
 
-    // Dependent dropdown updater engine
     function updateStopsDropdown() {
         const areaSelect = document.getElementById('pickupArea');
         const stopSelect = document.getElementById('pickupLocation');
@@ -203,7 +204,6 @@
         if (chosenArea && STOPS_DATA[chosenArea]) {
             stopSelect.disabled = false;
             
-            // Add initial default option
             const defaultOpt = document.createElement('option');
             defaultOpt.value = "";
             defaultOpt.disabled = true;
@@ -211,7 +211,6 @@
             defaultOpt.innerText = "-- Choose Specific Location --";
             stopSelect.appendChild(defaultOpt);
 
-            // Populate specific local stops
             STOPS_DATA[chosenArea].forEach(stop => {
                 const opt = document.createElement('option');
                 opt.value = stop;
