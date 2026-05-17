@@ -109,7 +109,7 @@
         <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading...</span></div>
         
         <div class="debt-warning">
-            <strong>Important Notice:</strong> A <strong>R40 transport contribution fee</strong> is owed immediately upon signing up. This debt is booked instantly, even if you cancel or do not show up on Sunday.
+            <strong>Important Notice:</strong> A <span id="dynamicWarningFee"><strong>R40 transport contribution fee</strong></span> is owed immediately upon signing up. This debt is booked instantly, even if you cancel or do not show up on Sunday.
         </div>
         
         <form id="transportForm">
@@ -125,10 +125,11 @@
 
             <div class="form-group">
                 <label for="serviceTime">Which Service Are You Attending?</label>
-                <select id="serviceTime" required>
+                <select id="serviceTime" required onchange="updateServiceSelectionDetails()">
                     <option value="" disabled selected>-- Choose Service Track --</option>
                     <option value="AM">🌅 Morning Service (Volunteering Team / Taxis)</option>
                     <option value="PM">🌆 Evening Service (General Sermon / Busses & Taxis)</option>
+                    <option value="Both">✨ Both Services (AM Volunteer + PM Sermon)</option>
                 </select>
             </div>
 
@@ -177,7 +178,7 @@
         </div>
         
         <h3>Digital Banking Contribution Info</h3>
-        <p>Please clear your R40 transport fee via EFT or your banking application before Sunday service setup.</p>
+        <p>Please clear your transport fee via EFT or your banking application before Sunday service setup.</p>
         
         <div class="bank-details">
             <div class="bank-row"><strong>Booking Date:</strong> <span class="targetSundayDate" style="font-weight: bold;"></span></div>
@@ -185,7 +186,7 @@
             <div class="bank-row"><strong>Account Name:</strong> <span>Church Transport Account</span></div>
             <div class="bank-row"><strong>Account Number:</strong> <span>1234567890</span></div>
             <div class="bank-row"><strong>Branch Code:</strong> <span>470010</span></div>
-            <div class="bank-row"><strong>Amount Due:</strong> <strong>R40.00</strong></div>
+            <div class="bank-row"><strong>Amount Due:</strong> <strong id="amountDueDisplay">R40.00</strong></div>
             <div class="bank-row" style="color: #c2410c;"><strong>EFT Reference:</strong> <span id="paymentRef">Name</span></div>
         </div>
         <p style="font-size: 0.85rem; color: #64748b; text-align: center;">If paying cash, please provide exact change to your vehicle coordinator upon boarding.</p>
@@ -200,7 +201,6 @@
 
     const churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // FIXED STRINGS MATRIX ALIGNED TO STABLE HISTORICAL VALUES
     const STOPS_DATA = {
         "CBD": ["Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
         "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
@@ -210,23 +210,18 @@
 
     function verifyRegistrationWindow() {
         const urlParams = new URLSearchParams(window.location.search);
-        
-        // 🔒 ADMIN BACKDOOR CHECK: If '?override=true' is present in the address bar, skip lockout rules completely
         if (urlParams.get('override') === 'true') {
             console.log("🔓 Administrative override active. Time gate bypassed.");
             return true;
         }
 
         const now = new Date();
-        
-        // Forces calculations to run strictly on South African Standard Time (SAST = UTC+2)
         const targetOffset = 2 * 60 * 60 * 1000;
         const sastTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + targetOffset);
         
-        const currentDay = sastTime.getDay();   // 0 = Sunday, 5 = Friday, 6 = Saturday
+        const currentDay = sastTime.getDay();   
         const currentHour = sastTime.getHours();
 
-        // STRICT TIME GATEWAY LOCKOUT: Shuts down precisely at Friday 20:00 (8 PM) SAST
         if ((currentDay === 5 && currentHour >= 20) || currentDay === 6 || currentDay === 0) {
             document.getElementById('bookingScreen').innerHTML = `
                 <div style="text-align:center; padding: 40px 10px; color:#dc2626;">
@@ -241,6 +236,21 @@
             return false;
         }
         return true;
+    }
+
+    // Dynamic warning updates based on service track combinations
+    function updateServiceSelectionDetails() {
+        const serviceChoice = document.getElementById('serviceTime').value;
+        const warningFeeBox = document.getElementById('dynamicWarningFee');
+        const submitBtn = document.getElementById('submitBtn');
+
+        if (serviceChoice === 'Both') {
+            warningFeeBox.innerHTML = "<strong>R80 transport contribution fee (R40 per service)</strong>";
+            submitBtn.innerText = "Confirm My Seats & Agree to R80";
+        } else {
+            warningFeeBox.innerHTML = "<strong>R40 transport contribution fee</strong>";
+            submitBtn.innerText = "Confirm My Seat & Agree to R40";
+        }
     }
 
     function updateStopsDropdown() {
@@ -286,31 +296,45 @@
 
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
-        // Final safety interception evaluation pass before hitting cloud resources
         if (!verifyRegistrationWindow()) return;
 
         const btn = document.getElementById('submitBtn');
+        const serviceChoice = document.getElementById('serviceTime').value;
+        
         btn.innerText = "Processing Your Seat...";
         btn.disabled = true;
         
-        const dataPayload = {
+        const baseDataPayload = {
             name: document.getElementById('fullName').value.trim(),
             phone: document.getElementById('phone').value.trim(),
-            service_time: document.getElementById('serviceTime').value, 
             visitor_status: document.getElementById('visitorStatus').value,
             structure: document.getElementById('structure').value.trim(),
             pickup_stop: document.getElementById('pickupLocation').value
         };
 
+        // Formulate multi-row bundle inserts based on selection
+        let bundlePayloads = [];
+        let finalCostString = "R40.00";
+
+        if (serviceChoice === 'Both') {
+            bundlePayloads.push({ ...baseDataPayload, service_time: 'AM' });
+            bundlePayloads.push({ ...baseDataPayload, service_time: 'PM' });
+            finalCostString = "R80.00";
+        } else {
+            bundlePayloads.push({ ...baseDataPayload, service_time: serviceChoice });
+            finalCostString = "R40.00";
+        }
+
         try {
-            const { error } = await churchDb.from('church_signups').insert([dataPayload]);
+            // Push payload collection straight to Supabase
+            const { error } = await churchDb.from('church_signups').insert(bundlePayloads);
             if (error) {
                 alert("❌ Booking Error:\n" + error.message);
-                btn.innerText = "Confirm My Seat & Agree to R40";
+                updateServiceSelectionDetails();
                 btn.disabled = false;
             } else {
-                document.getElementById('paymentRef').innerText = `${dataPayload.name.replace(/\s+/g, '').toUpperCase()}SUN`;
+                document.getElementById('amountDueDisplay').innerText = finalCostString;
+                document.getElementById('paymentRef').innerText = `${baseDataPayload.name.replace(/\s+/g, '').toUpperCase()}SUN`;
                 document.getElementById('bookingScreen').style.display = 'none';
                 document.getElementById('confirmationScreen').style.display = 'block';
             }
@@ -320,7 +344,6 @@
         }
     });
 
-    // Run active schedule evaluation loops upon document mount sequences
     if (verifyRegistrationWindow()) {
         calculateUpcomingSunday();
     }
