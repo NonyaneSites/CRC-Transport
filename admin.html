@@ -262,7 +262,7 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // MASTER CHRONOLOGICAL PATH SEQUENCE
+    // MASTER PATH SEQUENCE DEFINITION
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
@@ -354,15 +354,19 @@
     }
 
     async function fetchAndCompileLogistics() {
+        const statusHeader = document.getElementById('diagnosticStatus');
         try {
+            statusHeader.className = "status-good";
+            statusHeader.innerHTML = "🔄 Synchronizing live database rows...";
+
             const { data: records, error } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
             if (error) {
-                document.getElementById('diagnosticStatus').className = "status-bad";
-                document.getElementById('diagnosticStatus').innerHTML = "🚨 Database Error: " + error.message;
+                statusHeader.className = "status-bad";
+                statusHeader.innerHTML = "🚨 Database Error: " + error.message;
                 return;
             }
 
-            // PASS 0: AUTOMATIC REAL-TIME CASE-INSENSITIVE DEDUPLICATION
+            // PASS 0: REAL-TIME DEDUPLICATION
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -381,11 +385,12 @@
             limboSectionContainer.innerHTML = '';
 
             if(deduplicatedRecords.length === 0) {
+                statusHeader.innerHTML = "🟢 Live sync verified. Database is empty.";
                 manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
                 return;
             }
 
-            // DATA NORMALIZATION & STRING HARMONIZATION PIPELINE
+            // NORMALIZATION PIPELINE
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
@@ -412,7 +417,7 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXRACT STOPS EXCEEDING VEHICLE CAPACITY LIMITS (>=17)
+            // PASS 1: EXTRACT WHOLE CHECKPOINT GROUPS (>=17)
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -422,7 +427,7 @@
                 }
             });
 
-            // PASS 2: INTRA-AREA COHESION MATCHING (Finds exact 17-seat group fits internally inside areas)
+            // PASS 2: INTRA-AREA PERFECT COMBINATIONS (Exactly 17 seats packed together)
             let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
             uniqueAreas.forEach(areaName => {
                 let perfectMatchFound = true;
@@ -447,7 +452,7 @@
                 }
             });
 
-            // PASS 3: STANDALONE REGIONAL SURVIVAL CHECK (If remaining area riders total 14-17, keep them purely together)
+            // PASS 3: STANDALONE REGIONAL EFFICIENCY FLOOR PROTECTION (If area leftovers total 14-17, keep together)
             uniqueAreas.forEach(areaName => {
                 let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
                 if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
@@ -456,7 +461,7 @@
                 }
             });
 
-            // PASS 4: ADVANCED LEFTOVER MATCHING PACKER ENGINE (Enforces priority rules on open vehicles)
+            // PASS 4: DETERMINISTIC TIE-BREAKER LEFT-OVER ROUTER ENGINE
             let globalLeftoverStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
@@ -469,11 +474,9 @@
                 let currentStopGroup = globalLeftoverStops[0];
                 let targetStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(currentStopGroup.stopName);
                 
-                // Track vehicles currently sitting below full 17 capacity limits
                 let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
 
                 if (openCandidateTaxis.length === 0) {
-                    // No partially full vehicles exist, open a new vehicle container
                     let newTaxi = { passengers: [] };
                     let sliceBatch = currentStopGroup.passengers.splice(0, TAXI_CAPACITY);
                     sliceBatch.forEach(p => p.assigned = true);
@@ -482,35 +485,29 @@
                     
                     if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
                 } else {
-                    // Apply priority hierarchy criteria to select the best vehicle target
                     openCandidateTaxis.forEach(taxi => {
                         let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
-                        
-                        // Rule Part A: Count unique stops currently in the vehicle's run
                         taxi._stopsCount = uniqueStopsInTaxi.size;
                         
-                        // Rule Part B: Locate index position of the vehicle's last stop assignment
                         let maxSequenceIndex = -1;
                         uniqueStopsInTaxi.forEach(st => {
                             let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
                             if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
                         });
-                        
-                        // Calculate absolute geographic sequence step distance
-                        taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
+                        taxi._distanceToTarget = maxSequenceIndex === -1 ? 0 : Math.abs(maxSequenceIndex - targetStopIndex);
                     });
 
-                    // Sort candidate vehicles based on your precise ranking specifications
+                    // TIERED ORDER EVALUATION (Least Unique Stops -> Geographically Closest)
                     openCandidateTaxis.sort((a, b) => {
                         if (a._stopsCount !== b._stopsCount) {
-                            return a._stopsCount - b._stopsCount; // Least amount of unique stops first
+                            return a._stopsCount - b._stopsCount;
                         }
-                        return a._distanceToTarget - b._distanceToTarget; // Closest index distance layout next
+                        return a._distanceToTarget - b._distanceToTarget;
                     });
 
-                    // Pack the highest ranking target vehicle
                     let optimalTaxiTarget = openCandidateTaxis[0];
                     let remainingSeats = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
+                    
                     let sliceBatch = currentStopGroup.passengers.splice(0, remainingSeats);
                     sliceBatch.forEach(p => p.assigned = true);
                     optimalTaxiTarget.passengers.push(...sliceBatch);
@@ -519,32 +516,30 @@
                 }
             }
 
-            // Post-processing cleanup pass: Ensure ALL finalized vehicles meet the minimum safety floor bounds
+            // PASS 5: EFFICIENCY FLOOR VERIFICATION
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
                 } else {
-                    // Release passengers back to unassigned status so they populate Limbo automatically
                     taxi.passengers.forEach(p => p.assigned = false);
                     return false;
                 }
             });
 
+            finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
+            // PHASE 5: MANIFEST OUTPUT COMPILER
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
-                // Core Area Calculation
                 let areaTallyMap = {};
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
-                // DYNAMIC HEADERS DESIGN PIPELINE
                 let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
@@ -603,7 +598,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 6: UNASSIGNED LIMBO ACCORDION GENERATION
+            // PHASE 6: LIMBO FIELD DISPLAY
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -643,8 +638,11 @@
                 `;
                 limboSectionContainer.appendChild(limboDiv);
             }
+
+            statusHeader.innerHTML = "🟢 Cloud synchronization verified. Data is live.";
         } catch(err) {
-            alert("Exception parsing registers.");
+            statusHeader.className = "status-bad";
+            statusHeader.innerHTML = "🚨 Operational Exception: " + err.message;
             console.error(err);
         }
     }
