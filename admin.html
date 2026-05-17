@@ -262,7 +262,7 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // MASTER CHRONOLOGICAL SEQUENCE PATHWAY ARRANGEMENT
+    // MASTER CHRONOLOGICAL PATH SEQUENCE
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
@@ -273,7 +273,7 @@
 
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
-        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue": "Parktown Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route",
         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
     };
@@ -281,12 +281,11 @@
     let churchDb = null;
     let pendingDeletionId = null;
     let pendingDeletionName = null;
-    let currentRecordsPool = []; // Global memory array to securely handle strings without parsing errors
 
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            document.getElementById('diagnosticStatus').innerHTML = "⏳ Secure driver connected. Fetching live cloud rows...";
+            document.getElementById('diagnosticStatus').innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
             fetchAndCompileLogistics();
             calculateUpcomingSunday();
         } catch(err) {
@@ -363,7 +362,7 @@
                 return;
             }
 
-            // PASS 0: REAL-TIME DEDUPLICATION FILTER
+            // PASS 0: AUTOMATIC REAL-TIME CASE-INSENSITIVE DEDUPLICATION
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -374,7 +373,6 @@
                 }
             });
 
-            currentRecordsPool = deduplicatedRecords; // Sync with global runtime context memory
             document.getElementById('totalCount').innerText = deduplicatedRecords.length;
 
             const manifestContainer = document.getElementById('manifestContainer');
@@ -383,13 +381,11 @@
             limboSectionContainer.innerHTML = '';
 
             if(deduplicatedRecords.length === 0) {
-                document.getElementById('diagnosticStatus').className = "status-good";
-                document.getElementById('diagnosticStatus').innerHTML = "🟢 Cloud Live: Database Empty.";
                 manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
                 return;
             }
 
-            // DATA NORMALIZATION PIPELINE
+            // DATA NORMALIZATION & STRING HARMONIZATION PIPELINE
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
@@ -416,7 +412,7 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACT FULL VEHICLE LOADS FROM INDIVIDUAL CHECKPOINTS (>=17)
+            // PASS 1: EXRACT STOPS EXCEEDING VEHICLE CAPACITY LIMITS (>=17)
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -426,7 +422,7 @@
                 }
             });
 
-            // PASS 2: INTRA-AREA PERFECT COMBINATIONS (Finds stop groupings inside a single area that equal exactly 17)
+            // PASS 2: INTRA-AREA COHESION MATCHING (Finds exact 17-seat group fits internally inside areas)
             let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
             uniqueAreas.forEach(areaName => {
                 let perfectMatchFound = true;
@@ -451,7 +447,7 @@
                 }
             });
 
-            // PASS 3: STANDALONE AREA COHESION SURVIVAL PASS (Keeps single areas together if total is between 14-17)
+            // PASS 3: STANDALONE REGIONAL SURVIVAL CHECK (If remaining area riders total 14-17, keep them purely together)
             uniqueAreas.forEach(areaName => {
                 let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
                 if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
@@ -460,7 +456,7 @@
                 }
             });
 
-            // PASS 4: STABILIZED GLOBAL LEFTOVER PROCESSING ENGINE
+            // PASS 4: ADVANCED LEFTOVER MATCHING PACKER ENGINE (Enforces priority rules on open vehicles)
             let globalLeftoverStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
@@ -470,73 +466,85 @@
             });
 
             while (globalLeftoverStops.length > 0) {
-                let currentStopGroup = globalLeftoverStops.shift();
+                let currentStopGroup = globalLeftoverStops[0];
                 let targetStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(currentStopGroup.stopName);
-                let ridersToPlace = [...currentStopGroup.passengers];
+                
+                // Track vehicles currently sitting below full 17 capacity limits
+                let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
 
-                while (ridersToPlace.length > 0) {
-                    let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
-
-                    if (openCandidateTaxis.length === 0) {
-                        let newTaxi = { passengers: [] };
-                        let takeAmt = Math.min(ridersToPlace.length, TAXI_CAPACITY);
-                        let batch = ridersToPlace.splice(0, takeAmt);
-                        batch.forEach(p => p.assigned = true);
-                        newTaxi.passengers.push(...batch);
-                        finalizedTaxis.push(newTaxi);
-                    } else {
-                        openCandidateTaxis.forEach(taxi => {
-                            let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
-                            taxi._stopsCount = uniqueStopsInTaxi.size;
-                            
-                            let maxSequenceIndex = -1;
-                            uniqueStopsInTaxi.forEach(st => {
-                                let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
-                                if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
-                            });
-                            taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
-                        });
-
-                        openCandidateTaxis.sort((a, b) => {
-                            if (a._stopsCount !== b._stopsCount) return a._stopsCount - b._stopsCount;
-                            return a._distanceToTarget - b._distanceToTarget;
-                        });
-
-                        let optimalTaxiTarget = openCandidateTaxis[0];
-                        let seatsAvailable = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
-                        let takeAmt = Math.min(ridersToPlace.length, seatsAvailable);
+                if (openCandidateTaxis.length === 0) {
+                    // No partially full vehicles exist, open a new vehicle container
+                    let newTaxi = { passengers: [] };
+                    let sliceBatch = currentStopGroup.passengers.splice(0, TAXI_CAPACITY);
+                    sliceBatch.forEach(p => p.assigned = true);
+                    newTaxi.passengers.push(...sliceBatch);
+                    finalizedTaxis.push(newTaxi);
+                    
+                    if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
+                } else {
+                    // Apply priority hierarchy criteria to select the best vehicle target
+                    openCandidateTaxis.forEach(taxi => {
+                        let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
                         
-                        let batch = ridersToPlace.splice(0, takeAmt);
-                        batch.forEach(p => p.assigned = true);
-                        optimalTaxiTarget.passengers.push(...batch);
-                    }
+                        // Rule Part A: Count unique stops currently in the vehicle's run
+                        taxi._stopsCount = uniqueStopsInTaxi.size;
+                        
+                        // Rule Part B: Locate index position of the vehicle's last stop assignment
+                        let maxSequenceIndex = -1;
+                        uniqueStopsInTaxi.forEach(st => {
+                            let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
+                            if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
+                        });
+                        
+                        // Calculate absolute geographic sequence step distance
+                        taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
+                    });
+
+                    // Sort candidate vehicles based on your precise ranking specifications
+                    openCandidateTaxis.sort((a, b) => {
+                        if (a._stopsCount !== b._stopsCount) {
+                            return a._stopsCount - b._stopsCount; // Least amount of unique stops first
+                        }
+                        return a._distanceToTarget - b._distanceToTarget; // Closest index distance layout next
+                    });
+
+                    // Pack the highest ranking target vehicle
+                    let optimalTaxiTarget = openCandidateTaxis[0];
+                    let remainingSeats = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
+                    let sliceBatch = currentStopGroup.passengers.splice(0, remainingSeats);
+                    sliceBatch.forEach(p => p.assigned = true);
+                    optimalTaxiTarget.passengers.push(...sliceBatch);
+
+                    if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
                 }
             }
 
-            // PASS 5: POST-ALLOCATION EFFICIENCY TRIMMING
+            // Post-processing cleanup pass: Ensure ALL finalized vehicles meet the minimum safety floor bounds
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
                 } else {
+                    // Release passengers back to unassigned status so they populate Limbo automatically
                     taxi.passengers.forEach(p => p.assigned = false);
                     return false;
                 }
             });
 
-            finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 5: INTERFACE MANIFEST RENDERER
+            // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
+                // Core Area Calculation
                 let areaTallyMap = {};
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
+                // DYNAMIC HEADERS DESIGN PIPELINE
                 let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
@@ -569,7 +577,7 @@
                                 <td>${r.phone}</td>
                                 <td>${r.visitor_status}</td>
                                 <td>${r.structure}</td>
-                                <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id})">❌ Remove</button></td>
+                                <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
                             </tr>
                         `;
                     });
@@ -595,7 +603,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 6: UNASSIGNED LIMBO BOX DESIGN RENDERING
+            // PHASE 6: UNASSIGNED LIMBO ACCORDION GENERATION
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -611,7 +619,7 @@
                             <td style="color:#9f1239;">${r.phone}</td>
                             <td style="color:#9f1239;">${r.visitor_status}</td>
                             <td style="color:#9f1239;">${r.structure}</td>
-                            <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id})">❌ Remove</button></td>
+                            <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
                         </tr>
                     `;
                 });
@@ -635,13 +643,8 @@
                 `;
                 limboSectionContainer.appendChild(limboDiv);
             }
-
-            document.getElementById('diagnosticStatus').className = "status-good";
-            document.getElementById('diagnosticStatus').innerHTML = "🟢 Cloud synchronization verified. Data is live.";
-
         } catch(err) {
-            document.getElementById('diagnosticStatus').className = "status-bad";
-            document.getElementById('diagnosticStatus').innerHTML = "🚨 Processing Exception: " + err.message;
+            alert("Exception parsing registers.");
             console.error(err);
         }
     }
@@ -663,13 +666,10 @@
         } catch (err) { alert("Failed to generate report: " + err.message); }
     }
 
-    // SAFE SECURE MODAL CONTROLLERS (Uses clean numeric IDs to sidestep syntax issues)
-    function openSecurityModalGate(passengerId) {
+    function openSecurityModalGate(passengerId, passengerName) {
         pendingDeletionId = passengerId;
-        let matchedPassenger = currentRecordsPool.find(p => p.id === passengerId);
-        pendingDeletionName = matchedPassenger ? matchedPassenger.name : "Passenger";
-        
-        document.getElementById('targetPassengerNameText').innerText = pendingDeletionName;
+        pendingDeletionName = passengerName;
+        document.getElementById('targetPassengerNameText').innerText = passengerName;
         document.getElementById('modalPasswordInputField').value = "";
         document.getElementById('modalErrorMessageBox').style.display = "none";
         document.getElementById('customSecurityModal').style.display = "block";
@@ -700,10 +700,7 @@
         if (e.key === 'Enter') executeSecureCloudDeletion();
     });
 
-    // Run safe lifecycle boot bindings
-    window.addEventListener('DOMContentLoaded', () => {
-        initializeAdmin();
-    });
+    initializeAdmin();
 </script>
 </body>
 </html>
