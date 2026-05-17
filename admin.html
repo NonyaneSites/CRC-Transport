@@ -261,9 +261,9 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8; // HARD CONSTRAINT RULE
+    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER RULE
 
-    // UPDATED COMPRESSED CHRONOLOGICAL SEQUENTIAL PATH WITH MASTER HUBS
+    // UPDATED ROUTE SELECTION MAPPED TO CHECKPOINTS
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -336,7 +336,7 @@
         }
     }
 
-    // DYNAMIC CONDITIONAL ROUTE SEQUENCER: Enforces localized re-ordering rules dynamically per vehicle
+    // CONDITIONAL ROUTE MATRIX PLANNER
     function getCustomRouteSequence(taxiStopsList) {
         let sequence = [...MASTER_ROUTE_SEQUENCE];
         if (taxiStopsList.includes("Charlotte Maxeke") && taxiStopsList.includes("Education Campus") && taxiStopsList.includes("Arteria")) {
@@ -350,7 +350,7 @@
         return sequence;
     }
 
-    // Combinatorial subset packer identifying pure regional solutions that respect the 8-stop cap
+    // Combinatorial subset optimization engine
     function findPerfectSubset(stops, targetCapacity) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
@@ -370,7 +370,7 @@
         return null;
     }
 
-    // Tie breaker engine enforcing minimum existing complexity and chronological closeness
+    // Tie-breaker algorithm filtering by complexity matrix and proximity indexes
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
         let minStopsCount = Math.min(...taxisList.map(t => {
             return new Set(t.passengers.map(p => p.displayStop)).size;
@@ -405,14 +405,13 @@
             statusHeader.className = "status-good";
             statusHeader.innerHTML = "🔄 Synchronizing live database rows...";
 
-            const { data: records, error } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
+            const { data: records, error = null } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
             if (error) {
                 statusHeader.className = "status-bad";
                 statusHeader.innerHTML = "🚨 Database Error: " + error.message;
                 return;
             }
 
-            // PASS 0: AUTOMATIC REAL-TIME DE-DUPLICATION PIPELINE
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -436,7 +435,7 @@
                 return;
             }
 
-            // DATA NORMALIZATION LAYER FOR BRAAM SUPER-HUBS AND SUB-STOPS
+            // TRANSLATION LAYER STRUCTURING SPECIFIC PICKUP LABELS TO CENTRAL HUB SEQUENCES
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
@@ -471,7 +470,6 @@
 
             let finalizedTaxis = [];
 
-            // AGGREGATE WORKPOOL RIDER LISTS INTO STOP GROUPS
             let stopMap = {};
             workingPool.forEach(p => {
                 if (!stopMap[p.displayStop]) {
@@ -486,7 +484,7 @@
             });
             let allStopsList = Object.values(stopMap);
 
-            // PHASE 1: SEARCH REGIONAL PURE SUBSETS FULFILLING 17 SEATS & UNDER 8 STOPS
+            // PHASE 1: EXECUTE WHOLE REGIONAL MATCH COMBINATIONS
             let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
             uniqueAreas.forEach(areaName => {
                 let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
@@ -506,7 +504,7 @@
                 }
             });
 
-            // PHASE 2: GREEDY STRATEGY FILTERED BY SEAT SPACE AND THE 8 UNIQUE STOP CONSTRAINT
+            // PHASE 2: PACK REMAINING SPILLOVERS FULFILLING CAPACITY AND THE 8-STOP BOUNDS
             let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
             remainingStops.sort((a, b) => {
                 if (a.sourceArea !== b.sourceArea) {
@@ -521,15 +519,10 @@
 
                 let P = unassignedRiders.length;
                 
-                // CRITICAL FILTER: Lock out any taxi that violates capacity OR exceeds 8 stops upon adding this stop
                 let openTaxis = finalizedTaxis.filter(t => {
                     let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
                     currentStopsSet.add(stop.stopName);
-                    
-                    let hasSeatCapacity = (TAXI_CAPACITY - t.passengers.length) >= P;
-                    let respectsStopLimit = currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
-                    
-                    return hasSeatCapacity && respectsStopLimit;
+                    return (TAXI_CAPACITY - t.passengers.length) >= P && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
                 });
 
                 let chosenTaxi = null;
@@ -545,7 +538,7 @@
                 if (chosenTaxi) {
                     unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
                 } else {
-                    // Split spillover loop handling 8-stop enforcement limitations
+                    // TYPE-SAFE FALLBACK DISPATCH ENGINE
                     while (unassignedRiders.length > 0) {
                         let currentOpenTaxis = finalizedTaxis.filter(t => {
                             let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
@@ -568,13 +561,13 @@
                             finalizedTaxis.push(newTaxi);
                             let seatsToTake = Math.min(TAXI_CAPACITY, unassignedRiders.length);
                             let chunk = unassignedRiders.splice(0, seatsToTake);
-                            chunk.forEach(p => { p.assigned = true; newTaxi.push(p); });
+                            chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
                         }
                     }
                 }
             });
 
-            // PHASE 3: TRIM MANIFESTS FALLING SHORT OF THE EFFICIENCY LIMIT (14 SEATS)
+            // PHASE 3: REMOVE MANIFESTS SHORT OF CAPACITIES (14 SEATS)
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -588,7 +581,7 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 4: UI MANIFEST INTERFACE GENERATOR (Respects conditional sub-route adjustments)
+            // PHASE 4: UI GENERATION PIPELINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -609,7 +602,6 @@
                 let countSummaryMap = {};
                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
-                // GENERATE DYNAMIC CHRONOLOGICAL ORDERING FOR VEHICLE ROUTE PLAN
                 let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
 
                 let routePlanStrings = [];
@@ -666,7 +658,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: RUN UNASSIGNED LIMBO OUTPUT CARD
+            // PHASE 5: COMPILE UNASSIGNED PASSENGERS CARD CONTAINER
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -717,7 +709,7 @@
 
     async function downloadExcelBackup() {
         try {
-            const { data: records, error } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
+            const { data: records, error = null } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
             if (error) { alert("Error pulling backup: " + error.message); return; }
             let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
             records.forEach(r => {
@@ -753,7 +745,7 @@
             document.getElementById('modalErrorMessageBox').style.display = "none";
             document.getElementById('customSecurityModal').style.display = "none";
             try {
-                const { error } = await churchDb.from('church_signups').delete().eq('id', pendingDeletionId);
+                const { error = null } = await churchDb.from('church_signups').delete().eq('id', pendingDeletionId);
                 if (error) alert("Database error: " + error.message); else fetchAndCompileLogistics();
             } catch(dbErr) { alert("Network error: " + dbErr.message); }
             pendingDeletionId = null; pendingDeletionName = null;
