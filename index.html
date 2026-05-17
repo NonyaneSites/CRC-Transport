@@ -209,6 +209,14 @@
     };
 
     function verifyRegistrationWindow() {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 🔒 ADMIN BACKDOOR CHECK: If '?override=true' is present in the address bar, skip lockout rules completely
+        if (urlParams.get('override') === 'true') {
+            console.log("🔓 Administrative override active. Time gate bypassed.");
+            return true;
+        }
+
         const now = new Date();
         
         // Forces calculations to run strictly on South African Standard Time (SAST = UTC+2)
@@ -289,7 +297,7 @@
         const dataPayload = {
             name: document.getElementById('fullName').value.trim(),
             phone: document.getElementById('phone').value.trim(),
-            service_time: document.getElementById('serviceTime').value, // Injected Allocation Track Flag Mapping
+            service_time: document.getElementById('serviceTime').value, 
             visitor_status: document.getElementById('visitorStatus').value,
             structure: document.getElementById('structure').value.trim(),
             pickup_stop: document.getElementById('pickupLocation').value
