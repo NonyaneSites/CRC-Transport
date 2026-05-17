@@ -272,8 +272,8 @@
     const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
     const AREA_MAPPING = {
-        "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
-        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
+        "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route",
         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
     };
@@ -281,11 +281,12 @@
     let churchDb = null;
     let pendingDeletionId = null;
     let pendingDeletionName = null;
+    let currentRecordsPool = []; // Global memory array to securely handle strings without parsing errors
 
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            document.getElementById('diagnosticStatus').innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
+            document.getElementById('diagnosticStatus').innerHTML = "⏳ Secure driver connected. Fetching live cloud rows...";
             fetchAndCompileLogistics();
             calculateUpcomingSunday();
         } catch(err) {
@@ -362,7 +363,7 @@
                 return;
             }
 
-            // PASS 0: AUTOMATIC REAL-TIME CASE-INSENSITIVE DEDUPLICATION
+            // PASS 0: REAL-TIME DEDUPLICATION FILTER
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -373,6 +374,7 @@
                 }
             });
 
+            currentRecordsPool = deduplicatedRecords; // Sync with global runtime context memory
             document.getElementById('totalCount').innerText = deduplicatedRecords.length;
 
             const manifestContainer = document.getElementById('manifestContainer');
@@ -381,11 +383,13 @@
             limboSectionContainer.innerHTML = '';
 
             if(deduplicatedRecords.length === 0) {
+                document.getElementById('diagnosticStatus').className = "status-good";
+                document.getElementById('diagnosticStatus').innerHTML = "🟢 Cloud Live: Database Empty.";
                 manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
                 return;
             }
 
-            // DATA NORMALIZATION & STRING HARMONIZATION PIPELINE
+            // DATA NORMALIZATION PIPELINE
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
@@ -412,7 +416,7 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACT FULL LOADS FROM SINGLE CHECKPOINTS (>=17)
+            // PASS 1: EXTRACT FULL VEHICLE LOADS FROM INDIVIDUAL CHECKPOINTS (>=17)
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -456,7 +460,7 @@
                 }
             });
 
-            // PASS 4: RE-ENGINEERED STRATIFIED GLOBAL LEFTOVER ENGINE (Enforces strict placement prioritization)
+            // PASS 4: STABILIZED GLOBAL LEFTOVER PROCESSING ENGINE
             let globalLeftoverStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
@@ -471,11 +475,9 @@
                 let ridersToPlace = [...currentStopGroup.passengers];
 
                 while (ridersToPlace.length > 0) {
-                    // Filter taxis that currently have open seats
                     let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
 
                     if (openCandidateTaxis.length === 0) {
-                        // No open taxis exist, spin up a brand new unbroken route container
                         let newTaxi = { passengers: [] };
                         let takeAmt = Math.min(ridersToPlace.length, TAXI_CAPACITY);
                         let batch = ridersToPlace.splice(0, takeAmt);
@@ -483,33 +485,23 @@
                         newTaxi.passengers.push(...batch);
                         finalizedTaxis.push(newTaxi);
                     } else {
-                        // Calculate metrics on the open vehicles to determine your priority constraints
                         openCandidateTaxis.forEach(taxi => {
                             let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
-                            
-                            // Constraint 1: Least amount of unique stops in route
                             taxi._stopsCount = uniqueStopsInTaxi.size;
                             
-                            // Constraint 2: Find the last stop inside the route's progression sequence
                             let maxSequenceIndex = -1;
                             uniqueStopsInTaxi.forEach(st => {
                                 let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
                                 if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
                             });
-                            
-                            // Calculate sequence steps distance from last stop to the unassigned stop
                             taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
                         });
 
-                        // Sort candidates based on your strict tie-breaker layout guidelines
                         openCandidateTaxis.sort((a, b) => {
-                            if (a._stopsCount !== b._stopsCount) {
-                                return a._stopsCount - b._stopsCount; // Priority A: Least stops filled wins
-                            }
-                            return a._distanceToTarget - b._distanceToTarget; // Priority B: Closest geographic sequence distance wins
+                            if (a._stopsCount !== b._stopsCount) return a._stopsCount - b._stopsCount;
+                            return a._distanceToTarget - b._distanceToTarget;
                         });
 
-                        // Select the winner and pack as many passengers from this block as physically possible
                         let optimalTaxiTarget = openCandidateTaxis[0];
                         let seatsAvailable = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
                         let takeAmt = Math.min(ridersToPlace.length, seatsAvailable);
@@ -521,34 +513,30 @@
                 }
             }
 
-            // PASS 5: POST-ALLOCATION EFFICIENCY BOUNDS VERIFICATION TRIMMING
+            // PASS 5: POST-ALLOCATION EFFICIENCY TRIMMING
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
                 } else {
-                    // Release occupants back to unassigned status so they gracefully map to the Limbo Box
                     taxi.passengers.forEach(p => p.assigned = false);
                     return false;
                 }
             });
 
-            // Re-sync final states
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
+            // PHASE 5: INTERFACE MANIFEST RENDERER
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
-                // Core Area Representation Tally
                 let areaTallyMap = {};
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
-                // DYNAMIC MIXED HEADER RULE IMPLEMENTATION
                 let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
@@ -581,7 +569,7 @@
                                 <td>${r.phone}</td>
                                 <td>${r.visitor_status}</td>
                                 <td>${r.structure}</td>
-                                <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
+                                <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id})">❌ Remove</button></td>
                             </tr>
                         `;
                     });
@@ -623,7 +611,7 @@
                             <td style="color:#9f1239;">${r.phone}</td>
                             <td style="color:#9f1239;">${r.visitor_status}</td>
                             <td style="color:#9f1239;">${r.structure}</td>
-                            <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
+                            <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id})">❌ Remove</button></td>
                         </tr>
                     `;
                 });
@@ -647,8 +635,13 @@
                 `;
                 limboSectionContainer.appendChild(limboDiv);
             }
+
+            document.getElementById('diagnosticStatus').className = "status-good";
+            document.getElementById('diagnosticStatus').innerHTML = "🟢 Cloud synchronization verified. Data is live.";
+
         } catch(err) {
-            alert("Exception parsing registers.");
+            document.getElementById('diagnosticStatus').className = "status-bad";
+            document.getElementById('diagnosticStatus').innerHTML = "🚨 Processing Exception: " + err.message;
             console.error(err);
         }
     }
@@ -670,10 +663,13 @@
         } catch (err) { alert("Failed to generate report: " + err.message); }
     }
 
-    function openSecurityModalGate(passengerId, passengerName) {
+    // SAFE SECURE MODAL CONTROLLERS (Uses clean numeric IDs to sidestep syntax issues)
+    function openSecurityModalGate(passengerId) {
         pendingDeletionId = passengerId;
-        pendingDeletionName = passengerName;
-        document.getElementById('targetPassengerNameText').innerText = passengerName;
+        let matchedPassenger = currentRecordsPool.find(p => p.id === passengerId);
+        pendingDeletionName = matchedPassenger ? matchedPassenger.name : "Passenger";
+        
+        document.getElementById('targetPassengerNameText').innerText = pendingDeletionName;
         document.getElementById('modalPasswordInputField').value = "";
         document.getElementById('modalErrorMessageBox').style.display = "none";
         document.getElementById('customSecurityModal').style.display = "block";
@@ -704,7 +700,10 @@
         if (e.key === 'Enter') executeSecureCloudDeletion();
     });
 
-    initializeAdmin();
+    // Run safe lifecycle boot bindings
+    window.addEventListener('DOMContentLoaded', () => {
+        initializeAdmin();
+    });
 </script>
 </body>
 </html>
