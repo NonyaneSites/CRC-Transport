@@ -24,6 +24,7 @@
             --warning-bg: #fffbeb;
             --warning-text: #92400e;
             --warning-border: #fcd34d;
+            --bus-theme: #7c3aed;
         }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -51,6 +52,36 @@
         }
         .status-good { color: var(--success); font-weight: bold; }
         .status-bad { color: var(--error); font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 6px; }
+        
+        /* TABS NAVIGATION */
+        .tabs-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        .tab-btn {
+            background: #e2e8f0;
+            color: #475569;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        .tab-btn.active.pm-tab {
+            background: var(--bus-theme);
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
         .date-badge {
             display: inline-block;
             background-color: #eff6ff;
@@ -82,6 +113,9 @@
             transition: background 0.2s;
             border-left: 6px solid var(--success);
         }
+        .vehicle-header-trigger.bus-header {
+            border-left-color: var(--bus-theme);
+        }
         .vehicle-header-trigger:hover { background: #f1f5f9; }
         .vehicle-title {
             color: #065f46;
@@ -91,6 +125,7 @@
             align-items: center;
             gap: 10px;
         }
+        .vehicle-title.bus-title { color: #5b21b6; }
         .toggle-status-badge {
             font-size: 0.85rem;
             background: #e2e8f0;
@@ -152,6 +187,16 @@
             background: #fef3c7;
             color: var(--warning-text);
             border: 1px solid var(--warning-border);
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .hub-consolidation-tag {
+            background: #ede9fe;
+            color: #6d28d9;
+            border: 1px solid #c084fc;
             font-size: 0.75rem;
             padding: 2px 6px;
             border-radius: 4px;
@@ -224,15 +269,34 @@
 
     <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
-        <h2>🚖 Sunday Compiled Taxi Rosters</h2>
+        <h2>🚖 Transport Management Dashboard</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-        <p style="margin-bottom: 20px;">Total Unique Sign-Ups: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
         
-        <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
-        <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
-        <button class="refresh-btn" style="background: var(--error);" onclick="triggerClearAllGate()">🗑️ Clear All Sign-Ups</button>
+        <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
+            <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
+            <button class="refresh-btn" style="background: var(--error);" onclick="triggerClearAllGate()">🗑️ Clear All Sign-Ups</button>
+        </div>
+
+        <!-- SERVICE CONFIGURATION TRACK SELECTION TABS -->
+        <div class="tabs-nav">
+            <button class="tab-btn active" onclick="switchServiceTab('am')">🌅 AM Service (Volunteers / Taxis)</button>
+            <button class="tab-btn pm-tab" onclick="switchServiceTab('pm')">🌆 PM Service (Sermon / Busses & Taxis)</button>
+        </div>
         
-        <div id="manifestContainer" style="margin-top: 20px;"></div>
+        <!-- AM MANIFEST DISPLAY WORKSPACE -->
+        <div id="amTabPanel" class="tab-panel active">
+            <h3>🌅 Active Morning Commute Taxis</h3>
+            <p>Total Morning Registrations: <strong id="amTotalCount" style="color:var(--primary);">0</strong></p>
+            <div id="amManifestContainer"></div>
+        </div>
+
+        <!-- PM MANIFEST DISPLAY WORKSPACE -->
+        <div id="pmTabPanel" class="tab-panel">
+            <h3>🌆 Active Evening Commute Busses & Taxis</h3>
+            <p>Total Evening Registrations: <strong id="pmTotalCount" style="color:var(--bus-theme);">0</strong></p>
+            <div id="pmManifestContainer"></div>
+        </div>
     </div>
 
     <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
@@ -260,11 +324,17 @@
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const ADMIN_PASSWORD = "Church2026"; 
+    
+    // LOGISTICS CONSTRAINT LIMITS
     const TAXI_CAPACITY = 17;
-    const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER RULE
+    const TAXI_MIN_FLOOR = 14;
+    const TAXI_MAX_STOPS = 8;
+    
+    const BUS_CAPACITY = 60;
+    const BUS_MAX_STOPS = 5;
+    const PM_LOW_TRAFFIC_TAXI_THRESHOLD = 15;
 
-    // UPDATED ROUTE SELECTION MAPPED TO CHECKPOINTS
+    // MASTER CHECKPOINT SEQUENCE
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -281,6 +351,7 @@
     let churchDb = null;
     let pendingDeletionId = null;
     let pendingDeletionName = null;
+    let currentActiveServiceTab = 'am';
 
     function initializeAdmin() {
         try {
@@ -291,6 +362,21 @@
             document.getElementById('diagnosticStatus').className = "status-bad";
             document.getElementById('diagnosticStatus').innerHTML = "🚨 Connection Error: " + err.message;
         }
+    }
+
+    function switchServiceTab(serviceType) {
+        currentActiveServiceTab = serviceType;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        
+        if(serviceType === 'am') {
+            document.querySelector('.tab-btn[onclick*="am"]').classList.add('active');
+            document.getElementById('amTabPanel').classList.add('active');
+        } else {
+            document.querySelector('.tab-btn[onclick*="pm"]').classList.add('active');
+            document.getElementById('pmTabPanel').classList.add('active');
+        }
+        fetchAndCompileLogistics();
     }
 
     function calculateUpcomingSunday() {
@@ -311,13 +397,9 @@
         if (targetContentBlock.style.display === "block") {
             targetContentBlock.style.display = "none";
             targetBadge.innerText = "▼ Show List";
-            targetBadge.style.background = "#e2e8f0";
-            targetBadge.style.color = "#475569";
         } else {
             targetContentBlock.style.display = "block";
             targetBadge.innerText = "▲ Hide List";
-            targetBadge.style.background = "#dcfce7";
-            targetBadge.style.color = "#15803d";
         }
     }
 
@@ -327,17 +409,12 @@
         if (targetContentBlock.style.display === "block") {
             targetContentBlock.style.display = "none";
             targetBadge.innerText = "▼ Show List";
-            targetBadge.style.background = "#e2e8f0";
-            targetBadge.style.color = "#475569";
         } else {
             targetContentBlock.style.display = "block";
             targetBadge.innerText = "▲ Hide List";
-            targetBadge.style.background = "#ffe4e6";
-            targetBadge.style.color = "#9f1239";
         }
     }
 
-    // CONDITIONAL ROUTE MATRIX PLANNER
     function getCustomRouteSequence(taxiStopsList) {
         let sequence = [...MASTER_ROUTE_SEQUENCE];
         if (taxiStopsList.includes("Charlotte Maxeke") && taxiStopsList.includes("Education Campus") && taxiStopsList.includes("Arteria")) {
@@ -351,8 +428,7 @@
         return sequence;
     }
 
-    // Combinatorial subset optimization engine
-    function findPerfectSubset(stops, targetCapacity) {
+    function findPerfectSubset(stops, targetCapacity, maxStopsLimit) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
             let subset = [];
@@ -364,28 +440,20 @@
                     uniqueStopsSet.add(stops[j].stopName);
                 }
             }
-            if (sum === targetCapacity && uniqueStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT) {
+            if (sum === targetCapacity && uniqueStopsSet.size <= maxStopsLimit) {
                 return subset;
             }
         }
         return null;
     }
 
-    // Tie-breaker algorithm filtering by complexity matrix and proximity indexes
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
-        let minStopsCount = Math.min(...taxisList.map(t => {
-            return new Set(t.passengers.map(p => p.displayStop)).size;
-        }));
-        
-        let lowestStopsTaxis = taxisList.filter(t => {
-            return new Set(t.passengers.map(p => p.displayStop)).size === minStopsCount;
-        });
-
+        let minStopsCount = Math.min(...taxisList.map(t => new Set(t.passengers.map(p => p.displayStop)).size));
+        let lowestStopsTaxis = taxisList.filter(t => new Set(t.passengers.map(p => p.displayStop)).size === minStopsCount);
         if (lowestStopsTaxis.length === 1) return lowestStopsTaxis[0];
 
         let bestTaxiInstance = null;
         let minimumPathDistance = Infinity;
-
         lowestStopsTaxis.forEach(t => {
             t.passengers.forEach(p => {
                 let existingStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop);
@@ -396,7 +464,6 @@
                 }
             });
         });
-
         return bestTaxiInstance || lowestStopsTaxis[0];
     }
 
@@ -423,21 +490,25 @@
                 }
             });
 
-            document.getElementById('totalCount').innerText = deduplicatedRecords.length;
+            // SPLIT POOL INTO TIME TRACKS (Safeguards against undefined properties default to AM)
+            let amRecords = deduplicatedRecords.filter(r => !r.service_time || r.service_time.toLowerCase() === 'am');
+            let pmRecords = deduplicatedRecords.filter(r => r.service_time && r.service_time.toLowerCase() === 'pm');
 
-            const manifestContainer = document.getElementById('manifestContainer');
+            document.getElementById('amTotalCount').innerText = amRecords.length;
+            document.getElementById('pmTotalCount').innerText = pmRecords.length;
+
+            const amContainer = document.getElementById('amManifestContainer');
+            const pmContainer = document.getElementById('pmManifestContainer');
             const limboSectionContainer = document.getElementById('limboSectionContainer');
-            manifestContainer.innerHTML = '';
+            
+            amContainer.innerHTML = '';
+            pmContainer.innerHTML = '';
             limboSectionContainer.innerHTML = '';
 
-            if(deduplicatedRecords.length === 0) {
-                statusHeader.innerHTML = "🟢 Sync Verified. Real-time database is currently empty.";
-                manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
-                return;
-            }
+            let targetActiveRidersPool = currentActiveServiceTab === 'am' ? amRecords : pmRecords;
 
-            // TRANSLATION LAYER STRUCTURING SPECIFIC PICKUP LABELS TO CENTRAL HUB SEQUENCES
-            let workingPool = deduplicatedRecords.map(r => {
+            // TRANSLATION LAYER AND STANDARDIZATION MAPPINGS
+            let workingPool = targetActiveRidersPool.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
                 if (["56 jorissen", "amani", "apex", "student digzz", "ymca", "braam"].includes(dbStopRaw)) {
@@ -466,165 +537,203 @@
                         break;
                     }
                 }
-                return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
+                return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop, initialStop: displayStop };
             });
 
-            let finalizedTaxis = [];
+            let finalizedVehicles = [];
 
-            let stopMap = {};
-            workingPool.forEach(p => {
-                if (!stopMap[p.displayStop]) {
-                    stopMap[p.displayStop] = {
-                        stopName: p.displayStop,
-                        sourceArea: p.sourceArea,
-                        passengers: [],
-                        sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop)
-                    };
-                }
-                stopMap[p.displayStop].passengers.push(p);
-            });
-            let allStopsList = Object.values(stopMap);
-
-            // PHASE 1: EXECUTE WHOLE REGIONAL MATCH COMBINATIONS
-            let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
-            uniqueAreas.forEach(areaName => {
-                let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
-                let processingArea = true;
-                while (processingArea) {
-                    let unallocatedAreaStops = areaStops.filter(s => s.passengers.every(p => !p.assigned));
-                    let perfectSubset = findPerfectSubset(unallocatedAreaStops, TAXI_CAPACITY);
-                    if (perfectSubset) {
-                        let taxiPassengers = [];
-                        perfectSubset.forEach(stop => {
-                            stop.passengers.forEach(p => { p.assigned = true; taxiPassengers.push(p); });
-                        });
-                        finalizedTaxis.push({ passengers: taxiPassengers });
-                    } else {
-                        processingArea = false;
+            // Execute processing route forks
+            if (currentActiveServiceTab === 'am') {
+                /****************************************************************
+                 * AM COMPILATION STANDARD TRACK: TAXI ENGINE RUN ONLY
+                 ****************************************************************/
+                let stopMap = {};
+                workingPool.forEach(p => {
+                    if (!stopMap[p.displayStop]) {
+                        stopMap[p.displayStop] = { stopName: p.displayStop, sourceArea: p.sourceArea, passengers: [], sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop) };
                     }
-                }
-            });
-
-            // PHASE 2: PACK REMAINING SPILLOVERS FULFILLING CAPACITY AND THE 8-STOP BOUNDS
-            let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
-            remainingStops.sort((a, b) => {
-                if (a.sourceArea !== b.sourceArea) {
-                    return uniqueAreas.indexOf(a.sourceArea) - uniqueAreas.indexOf(b.sourceArea);
-                }
-                return a.sequenceIndex - b.sequenceIndex;
-            });
-
-            remainingStops.forEach(stop => {
-                let unassignedRiders = stop.passengers.filter(p => !p.assigned);
-                if (unassignedRiders.length === 0) return;
-
-                let P = unassignedRiders.length;
-                
-                let openTaxis = finalizedTaxis.filter(t => {
-                    let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
-                    currentStopsSet.add(stop.stopName);
-                    return (TAXI_CAPACITY - t.passengers.length) >= P && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
+                    stopMap[p.displayStop].passengers.push(p);
                 });
+                let allStopsList = Object.values(stopMap);
 
-                let chosenTaxi = null;
-                if (openTaxis.length > 0) {
-                    let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
-                    if (perfectFitTaxis.length > 0) {
-                        chosenTaxi = selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex);
-                    } else {
-                        chosenTaxi = selectBestTaxiByRules(openTaxis, stop.sequenceIndex);
-                    }
-                }
-
-                if (chosenTaxi) {
-                    unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
-                } else {
-                    // TYPE-SAFE FALLBACK DISPATCH ENGINE
-                    while (unassignedRiders.length > 0) {
-                        let currentOpenTaxis = finalizedTaxis.filter(t => {
-                            let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
-                            currentStopsSet.add(stop.stopName);
-                            return (TAXI_CAPACITY - t.passengers.length) > 0 && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
-                        });
-
-                        let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
-                        
-                        if (fitTaxi) {
-                            let chunk = unassignedRiders.splice(0, unassignedRiders.length);
-                            chunk.forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
-                        } else if (currentOpenTaxis.length > 0) {
-                            let partialTaxi = currentOpenTaxis[0];
-                            let seatsAvailable = TAXI_CAPACITY - partialTaxi.passengers.length;
-                            let chunk = unassignedRiders.splice(0, seatsAvailable);
-                            chunk.forEach(p => { p.assigned = true; partialTaxi.passengers.push(p); });
+                let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
+                uniqueAreas.forEach(areaName => {
+                    let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
+                    let processingArea = true;
+                    while (processingArea) {
+                        let unallocatedAreaStops = areaStops.filter(s => s.passengers.every(p => !p.assigned));
+                        let perfectSubset = findPerfectSubset(unallocatedAreaStops, TAXI_CAPACITY, TAXI_MAX_STOPS);
+                        if (perfectSubset) {
+                            let taxiPassengers = [];
+                            perfectSubset.forEach(stop => stop.passengers.forEach(p => { p.assigned = true; taxiPassengers.push(p); }));
+                            finalizedVehicles.push({ type: 'taxi', capacity: TAXI_CAPACITY, maxStops: TAXI_MAX_STOPS, passengers: taxiPassengers });
                         } else {
-                            let newTaxi = { passengers: [] };
-                            finalizedTaxis.push(newTaxi);
-                            let seatsToTake = Math.min(TAXI_CAPACITY, unassignedRiders.length);
-                            let chunk = unassignedRiders.splice(0, seatsToTake);
-                            chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
+                            processingArea = false;
                         }
                     }
-                }
-            });
+                });
 
-            // PHASE 3: REMOVE MANIFESTS SHORT OF CAPACITIES (14 SEATS)
-            finalizedTaxis = finalizedTaxis.filter(taxi => {
-                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    return true;
-                } else {
-                    taxi.passengers.forEach(p => p.assigned = false);
-                    return false;
-                }
-            });
+                let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
+                remainingStops.sort((a, b) => a.sourceArea !== b.sourceArea ? uniqueAreas.indexOf(a.sourceArea) - uniqueAreas.indexOf(b.sourceArea) : a.sequenceIndex - b.sequenceIndex);
 
-            finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
+                remainingStops.forEach(stop => {
+                    let unassignedRiders = stop.passengers.filter(p => !p.assigned);
+                    if (unassignedRiders.length === 0) return;
+
+                    let P = unassignedRiders.length;
+                    let openTaxis = finalizedVehicles.filter(t => {
+                        let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
+                        currentStopsSet.add(stop.stopName);
+                        return (TAXI_CAPACITY - t.passengers.length) >= P && currentStopsSet.size <= TAXI_MAX_STOPS;
+                    });
+
+                    let chosenTaxi = null;
+                    if (openTaxis.length > 0) {
+                        let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
+                        chosenTaxi = perfectFitTaxis.length > 0 ? selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex) : selectBestTaxiByRules(openTaxis, stop.sequenceIndex);
+                    }
+
+                    if (chosenTaxi) {
+                        unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
+                    } else {
+                        while (unassignedRiders.length > 0) {
+                            let currentOpenTaxis = finalizedVehicles.filter(t => {
+                                let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
+                                currentStopsSet.add(stop.stopName);
+                                return (TAXI_CAPACITY - t.passengers.length) > 0 && currentStopsSet.size <= TAXI_MAX_STOPS;
+                            });
+
+                            let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
+                            if (fitTaxi) {
+                                unassignedRiders.splice(0, unassignedRiders.length).forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
+                            } else if (currentOpenTaxis.length > 0) {
+                                let partialTaxi = currentOpenTaxis[0];
+                                let seatsAvailable = TAXI_CAPACITY - partialTaxi.passengers.length;
+                                unassignedRiders.splice(0, seatsAvailable).forEach(p => { p.assigned = true; partialTaxi.passengers.push(p); });
+                            } else {
+                                let newTaxi = { type: 'taxi', capacity: TAXI_CAPACITY, maxStops: TAXI_MAX_STOPS, passengers: [] };
+                                finalizedVehicles.push(newTaxi);
+                                unassignedRiders.splice(0, Math.min(TAXI_CAPACITY, unassignedRiders.length)).forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
+                            }
+                        }
+                    }
+                });
+
+                // Apply minimum volume threshold filters to AM Taxis
+                finalizedVehicles = finalizedVehicles.filter(v => {
+                    if (v.passengers.length >= TAXI_MIN_FLOOR) return true;
+                    v.passengers.forEach(p => p.assigned = false); return false;
+                });
+
+            } else {
+                /****************************************************************
+                 * PM COMPILATION MASS-TRANSIT TRACK: BUS & FALLBACK TAXI LEGS
+                 ****************************************************************/
+                let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
+                
+                uniqueAreas.forEach(areaName => {
+                    let areaRiders = workingPool.filter(p => p.sourceArea === areaName);
+                    if (areaRiders.length === 0) return;
+
+                    // RULE 1: If whole area volume is extremely low, immediately send a Taxi instead of a Bus
+                    if (areaRiders.length < PM_LOW_TRAFFIC_TAXI_THRESHOLD) {
+                        let taxiInstance = { type: 'taxi', capacity: TAXI_CAPACITY, maxStops: TAXI_MAX_STOPS, passengers: [] };
+                        finalizedVehicles.push(taxiInstance);
+                        areaRiders.forEach(p => { p.assigned = true; taxiInstance.passengers.push(p); });
+                        return;
+                    }
+
+                    // RULE 2: High Traffic Areas are designated for 60-Seater Busses
+                    let activeUniqueStops = Array.from(new Set(areaRiders.map(p => p.displayStop)));
+                    
+                    // BUS HUB CONSOLIDATION LOGIC MATRIX (Ensures no bus visits more than 5 physical nodes)
+                    if (activeUniqueStops.length > BUS_MAX_STOPS) {
+                        activeUniqueStops.sort((a, b) => {
+                            let countA = areaRiders.filter(p => p.displayStop === a).length;
+                            let countB = areaRiders.filter(p => p.displayStop === b).length;
+                            return countA - countB; // Sort ascending to drop lowest volume targets first
+                        });
+
+                        while (activeUniqueStops.length > BUS_MAX_STOPS) {
+                            let lowestStopName = activeUniqueStops.shift();
+                            let lowStopRiders = areaRiders.filter(p => p.displayStop === lowestStopName);
+                            let lowestIdx = MASTER_ROUTE_SEQUENCE.indexOf(lowestStopName);
+
+                            // Discover closest high volume checkpoint alternative hub matching index proximity bounds
+                            let nearestHubName = null;
+                            let minDistance = Infinity;
+                            activeUniqueStops.forEach(hubName => {
+                                let hubIdx = MASTER_ROUTE_SEQUENCE.indexOf(hubName);
+                                let dist = Math.abs(hubIdx - lowestIdx);
+                                if (dist < minDistance) { minDistance = dist; nearestHubName = hubName; }
+                            });
+
+                            // Re-route passengers to stop consolidation hubs
+                            lowStopRiders.forEach(p => {
+                                p.displayStop = nearestHubName; 
+                                p.isConsolidated = true;
+                            });
+                        }
+                    }
+
+                    // Pack passengers into 60-seat bus containers
+                    while (areaRiders.length > 0) {
+                        let busInstance = { type: 'bus', capacity: BUS_CAPACITY, maxStops: BUS_MAX_STOPS, passengers: [] };
+                        finalizedVehicles.push(busInstance);
+                        let chunk = areaRiders.splice(0, BUS_CAPACITY);
+                        chunk.forEach(p => { p.assigned = true; busInstance.passengers.push(p); });
+                    }
+                });
+            }
+
+            finalizedVehicles.forEach(v => v.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
-            let globalTaxiCounter = 1;
+            let globalVehicleCounter = 1;
 
-            // PHASE 4: UI GENERATION PIPELINE
-            finalizedTaxis.forEach(taxi => {
-                let runningGlobalId = globalTaxiCounter++;
+            // PHASE 4: UI MANIFEST INTERFACE RENDERING ENGINE
+            let targetOutputPane = currentActiveServiceTab === 'am' ? amContainer : pmContainer;
+
+            finalizedVehicles.forEach(vehicle => {
+                let runningGlobalId = globalVehicleCounter++;
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
                 let areaTallyMap = {};
-                taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
+                vehicle.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
-                let uniqueStopsInTaxiSet = new Set(taxi.passengers.map(p => p.displayStop));
-                let uniqueStopsInTaxiCount = uniqueStopsInTaxiSet.size;
-                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
+                let uniqueStopsInVehicleSet = new Set(vehicle.passengers.map(p => p.displayStop));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
-                let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
-                    ? `${cleanAreaLabelName} (Mixed) Manifest` 
-                    : `${majorityArea} Manifest`;
+                
+                let vehicleLabelPrefix = vehicle.type === 'bus' ? `🚍 Bus #${runningGlobalId}` : `🚖 Taxi #${runningGlobalId}`;
+                let dynamicRouteHeaderTitle = `${vehicleLabelPrefix} — ${cleanAreaLabelName} Manifest`;
 
                 let countSummaryMap = {};
-                taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
+                vehicle.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
-                let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
+                let orderedSequenceForVehicle = getCustomRouteSequence(Array.from(uniqueStopsInVehicleSet));
 
                 let routePlanStrings = [];
-                orderedSequenceForTaxi.forEach(sName => {
+                orderedSequenceForVehicle.forEach(sName => {
                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
                 });
 
                 let tableRowsHtml = '';
                 let passengerIndexCounter = 1;
 
-                orderedSequenceForTaxi.forEach(sName => {
-                    let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
+                orderedSequenceForVehicle.forEach(sName => {
+                    let stopPassengers = vehicle.passengers.filter(p => p.displayStop === sName);
                     stopPassengers.forEach(r => {
                         let isMinorityRider = r.sourceArea !== majorityArea;
                         let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
+                        let consolidationBadgeMarkup = r.isConsolidated ? `<span class="hub-consolidation-tag">Consolidated from ${r.initialStop}</span>` : '';
                         let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
 
                         tableRowsHtml += `
                             <tr ${crossRowStyle}>
                                 <td><strong>${passengerIndexCounter++}.</strong></td>
                                 <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
-                                <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
+                                <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup} ${consolidationBadgeMarkup}</td>
                                 <td>${r.phone}</td>
                                 <td>${r.visitor_status}</td>
                                 <td>${r.structure}</td>
@@ -634,12 +743,15 @@
                     });
                 });
 
+                let headerClassModifier = vehicle.type === 'bus' ? 'bus-header' : '';
+                let titleClassModifier = vehicle.type === 'bus' ? 'bus-title' : '';
+
                 vehicleBlockElement.innerHTML = `
-                    <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
-                        <div class="vehicle-title">
-                            🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} 
+                    <div class="vehicle-header-trigger ${headerClassModifier}" onclick="toggleTaxiView(${runningGlobalId})">
+                        <div class="vehicle-title ${titleClassModifier}">
+                            ${dynamicRouteHeaderTitle} 
                             <span style="font-weight:normal; font-size:0.95rem; color:#475569;">
-                                (${taxi.passengers.length}/${TAXI_CAPACITY} seats • 📌 ${uniqueStopsInTaxiCount}/${MAX_UNIQUE_STOPS_LIMIT} stops)
+                                (${vehicle.passengers.length}/${vehicle.capacity} seats • 📌 ${uniqueStopsInVehicleSet.size}/${vehicle.maxStops} stops)
                             </span>
                         </div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
@@ -656,7 +768,7 @@
                         </div>
                     </div>
                 `;
-                manifestContainer.appendChild(vehicleBlockElement);
+                targetOutputPane.appendChild(vehicleBlockElement);
             });
 
             // PHASE 5: COMPILE UNASSIGNED PASSENGERS CARD CONTAINER
@@ -686,7 +798,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers) or cannot fit existing taxis without violating the maximum 8 stops constraint limit.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds or cannot fit existing vehicles without violating strict routing rules.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
@@ -710,11 +822,11 @@
 
     async function downloadExcelBackup() {
         try {
-            const { data: records, error = null } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
+            const { data: records, error = null } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, service_time, created_at').order('created_at', { ascending: true });
             if (error) { alert("Error pulling backup: " + error.message); return; }
-            let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
+            let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Service Track,Signup Date/Time\n";
             records.forEach(r => {
-                let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
+                let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${r.service_time || 'AM'}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
                 csvContent += row + "\n";
             });
             const encodedUri = encodeURI(csvContent);
@@ -755,35 +867,18 @@
         }
     }
 
-    // INSTANT MASTER WIPE ENGINE FOR MANUAL CYCLE CLEARS
+    async function triggerCOnfiremWipe() {
+        const { error } = await churchDb.from('church_signups').delete().not('id', 'is', null);
+        if (error) alert("Wipe Exception: " + error.message);
+        else { alert("🗑️ Live database cleared successfully."); fetchAndCompileLogistics(); }
+    }
+
     async function triggerClearAllGate() {
-        const accessPasswordInput = prompt("⚠️ WARNING: You are about to completely wipe the entire signup roster from the live cloud database.\n\nPlease enter the administrative password to confirm action:");
+        const accessPasswordInput = prompt("⚠️ WARNING: You are about to completely wipe all signups from the live cloud database.\n\nPlease enter the administrative password to confirm action:");
         if (accessPasswordInput === null) return; 
-
         if (accessPasswordInput === ADMIN_PASSWORD) {
-            const finalWarningConfirmation = confirm("Are you absolutely sure? This will remove all names and reset the dashboard rosters instantly.");
-            if (!finalWarningConfirmation) return;
-
-            const diagnosticBoxHeader = document.getElementById('diagnosticStatus');
-            try {
-                diagnosticBoxHeader.className = "status-good";
-                diagnosticBoxHeader.innerHTML = "⏳ Communicating wipe request with cloud servers...";
-
-                // Universally target all existing rows safely without encountering type cast compilation issues
-                const { error } = await churchDb.from('church_signups').delete().not('id', 'is', null);
-                
-                if (error) {
-                    alert("Database Wipe Exception: " + error.message);
-                } else {
-                    alert("🗑️ Live roster wiped successfully. System reset accomplished.");
-                    fetchAndCompileLogistics();
-                }
-            } catch (networkException) {
-                alert("Network communication dropped: " + networkException.message);
-            }
-        } else {
-            alert("❌ Incorrect Password. Database wipe aborted.");
-        }
+            if (confirm("Are you absolutely sure? This cannot be undone.")) { triggerCOnfiremWipe(); }
+        } else { alert("❌ Incorrect Password. Database wipe aborted."); }
     }
 
     document.getElementById('modalPasswordInputField').addEventListener('keyup', function(e) {
