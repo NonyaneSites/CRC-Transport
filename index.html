@@ -3,230 +3,275 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church Transport Registration</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
+    <title>Church Sunday Transport Portal</title>
     
-    <!-- Include Supabase Cloud Library -->
+    <!-- EMBEDDED HIGH-RESOLUTION APPLICATION FAVICON ICON -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛪</text></svg>">
+    
+    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <style>
         :root {
             --primary: #1e40af;
-            --primary-hover: #1d4ed8;
+            --success: #059669;
             --bg: #f8fafc;
             --card: #ffffff;
             --text: #334155;
-            --border: #cbd5e1;
         }
         body {
             font-family: system-ui, -apple-system, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 90vh;
+            padding: 15px;
         }
-        .form-card {
+        .container { max-width: 650px; margin: 0 auto; }
+        .card {
             background: var(--card);
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
-            width: 100%;
-            max-width: 450px;
-            box-sizing: border-box;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
         }
-        h2 { margin-top: 0; color: #0f172a; text-align: center; font-size: 1.5rem; }
-        p.subtitle { text-align: center; color: #64748b; font-size: 0.9rem; margin-top: -10px; margin-bottom: 25px; }
-        .form-group { margin-bottom: 18px; }
-        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: #475569; }
+        h2, h3 { margin-top: 0; color: #0f172a; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; color: #475569; }
         input, select {
             width: 100%;
             padding: 12px;
-            border: 1.5px solid var(--border);
+            border: 1.5px solid #cbd5e1;
             border-radius: 8px;
-            font-size: 1rem;
             box-sizing: border-box;
-            transition: border-color 0.2s;
+            font-size: 1rem;
         }
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        button {
+        select:disabled { background-color: #e2e8f0; cursor: not-allowed; }
+        .btn {
             width: 100%;
+            padding: 14px;
             background: var(--primary);
             color: white;
             border: none;
-            padding: 14px;
             border-radius: 8px;
-            font-size: 1rem;
             font-weight: bold;
+            font-size: 1rem;
             cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
         }
-        button:hover { background: var(--primary-hover); }
-        .status-msg {
-            text-align: center;
+        .btn:hover { background: #1d4ed8; }
+        .date-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1e40af;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            border: 1px solid #bfdbfe;
+        }
+        .debt-warning {
+            background-color: #fffbeb;
+            border: 1px solid #fef08a;
+            color: #854d0e;
             padding: 12px;
             border-radius: 8px;
-            font-weight: bold;
-            margin-top: 15px;
-            display: none;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
         }
-        .success { background: #dcfce7; color: #15803d; }
-        .error { background: #fee2e2; color: #b91c1c; }
+        #confirmationScreen { display: none; }
+        .success-banner {
+            background-color: #dcfce7;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        .bank-details {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .bank-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
-<div class="form-card" id="formContainer">
-    <h2>🚖 Sunday Service Transport</h2>
-    <p class="subtitle">Secure your seat inside the weekly compiled rosters</p>
-    
-    <form id="signupForm" onsubmit="handleFormSubmission(event)">
-        <div class="form-group">
-            <label for="fullName">Full Name</label>
-            <input type="text" id="fullName" required placeholder="Enter your first and last name">
+<div class="container">
+
+    <!-- SCREEN 1: SIGN-UP FORM -->
+    <div id="bookingScreen" class="card">
+        <h2>Sunday Transport Sign-Up</h2>
+        <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading...</span></div>
+        
+        <div class="debt-warning">
+            <strong>Important Notice:</strong> A <strong>R40 transport contribution fee</strong> is owed immediately upon signing up. This debt is booked instantly, even if you cancel or do not show up on Sunday.
         </div>
         
-        <div class="form-group">
-            <label for="phoneNumber">Phone Number</label>
-            <input type="tel" id="phoneNumber" required placeholder="e.g. 0821234567">
+        <form id="transportForm">
+            <div class="form-group">
+                <label for="fullName">Full Name</label>
+                <input type="text" id="fullName" placeholder="e.g. Sipho Zulu" required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number</label>
+                <input type="tel" id="phone" placeholder="e.g. 0821234567" required>
+            </div>
+
+            <div class="form-group">
+                <label for="visitorStatus">Attendance Classification</label>
+                <select id="visitorStatus" required>
+                    <option value="" disabled selected>-- Select Status --</option>
+                    <option value="Member">Member</option>
+                    <option value="Visitor">Visitor</option>
+                    <option value="First Time Visitor">First Time Visitor</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="structure">Your Structure</label>
+                <input type="text" id="structure" placeholder="e.g. S1, S2, S3, etc." required>
+            </div>
+
+            <div class="form-group">
+                <label for="pickupArea">Select Transport Area</label>
+                <select id="pickupArea" required onchange="updateStopsDropdown()">
+                    <option value="" disabled selected>-- Choose Area --</option>
+                    <option value="CBD">CBD</option>
+                    <option value="Parktown">Parktown</option>
+                    <option value="Braam">Braam</option>
+                    <option value="Auckland Park">Auckland Park</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="pickupLocation">Select Your Specific Stop</label>
+                <select id="pickupLocation" required disabled>
+                    <option value="" disabled selected>-- Choose Area First --</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn">Confirm My Seat & Agree to R40</button>
+        </form>
+    </div>
+
+    <!-- SCREEN 2: VISUAL CONFIRMATION SCREEN -->
+    <div id="confirmationScreen" class="card">
+        <div class="success-banner">
+            🎉 SEAT RESERVED SUCCESSFULLY!<br>
+            Your details have been locked into the Sunday driving manifest.
         </div>
         
-        <div class="form-group">
-            <label for="visitorStatus">Classification</label>
-            <select id="visitorStatus" required>
-                <option value="" disabled selected>Select your status</option>
-                <option value="Member">Member</option>
-                <option value="Visitor">Visitor</option>
-            </select>
-        </div>
+        <h3>Digital Banking Contribution Info</h3>
+        <p>Please clear your R40 transport fee via EFT or your banking application before Sunday service setup.</p>
         
-        <div class="form-group">
-            <label for="structureName">Structure / Cell Group</label>
-            <input type="text" id="structureName" required placeholder="e.g. Youth, None, Zone 3">
+        <div class="bank-details">
+            <div class="bank-row"><strong>Booking Date:</strong> <span class="targetSundayDate" style="font-weight: bold;"></span></div>
+            <div class="bank-row"><strong>Bank:</strong> <span>Capitec Bank</span></div>
+            <div class="bank-row"><strong>Account Name:</strong> <span>Church Transport Account</span></div>
+            <div class="bank-row"><strong>Account Number:</strong> <span>1234567890</span></div>
+            <div class="bank-row"><strong>Branch Code:</strong> <span>470010</span></div>
+            <div class="bank-row"><strong>Amount Due:</strong> <strong>R40.00</strong></div>
+            <div class="bank-row" style="color: #c2410c;"><strong>EFT Reference:</strong> <span id="paymentRef">Name</span></div>
         </div>
-        
-        <div class="form-group">
-            <label for="pickupStop">Select Your Pickup Stop</label>
-            <select id="pickupStop" required>
-                <option value="" disabled selected>Choose your exact location...</option>
-                <!-- EXACT ORDERED ROUTE CHECKPOINTS -->
-                <option value="Ghandi Square">Ghandi Square</option>
-                <option value="Maboneng">Maboneng</option>
-                <option value="Urban Circle">Urban Circle</option>
-                <option value="DFC Bus Stop">DFC Bus Stop</option>
-                <option value="The Fields">The Fields</option>
-                <option value="Saratoga">Saratoga</option>
-                <option value="Gateway">Gateway</option>
-                <option value="Focus 1">Focus 1</option>
-                <option value="Focus 2">Focus 2</option>
-                <option value="Braam">Braam (56 Jorissen, Amani, Apex, Student Digzz, YMCA)</option>
-                <option value="Campus Central on Empire">Campus Central on Empire</option>
-                <option value="Argyle">Argyle</option>
-                <option value="Junction">Junction</option>
-                <option value="Arteria">Arteria</option>
-                <option value="Education Campus">Education Campus</option>
-                <option value="Charlotte Maxeke">Charlotte Maxeke</option>
-                <option value="EOH">EOH</option>
-                <option value="Knockando">Knockando</option>
-                <option value="Gate 7">Gate 7 (Amic Deck, Gate 7)</option>
-                <option value="Yale">Yale</option>
-                <option value="Stanley Avenue">Stanley Avenue</option>
-                <option value="UJ Bunting">UJ Bunting</option>
-                <option value="Laborie">Laborie</option>
-                <option value="Richmond">Richmond</option>
-                <option value="Gate 2">Gate 2</option>
-                <option value="Gate 4">Gate 4</option>
-                <option value="Westdene Engen">Westdene Engen</option>
-                <option value="APK McDonald">APK McDonald</option>
-            </select>
-        </div>
-        
-        <button type="submit" id="submitBtn">Submit Registration</button>
-    </form>
-    
-    <div id="statusNotification" class="status-msg"></div>
+        <p style="font-size: 0.85rem; color: #64748b; text-align: center;">If paying cash, please provide exact change to your vehicle coordinator upon boarding.</p>
+        <button class="btn" style="background: #64748b;" onclick="window.location.reload()">Book Another Person</button>
+    </div>
+
 </div>
 
 <script>
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
-    let supabaseClient = null;
 
-    function verifyRegistrationWindow() {
-        const now = new Date();
-        
-        // Convert to South African Standard Time (SAST = UTC+2)
-        const targetOffset = 2 * 60 * 60 * 1000;
-        const sastTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + targetOffset);
-        
-        const currentDay = sastTime.getDay();   // 0 = Sunday, 5 = Friday, 6 = Saturday
-        const currentHour = sastTime.getHours();
+    const churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // STRICT GATEWAY: Closes Friday at 20:00 (8 PM) SAST through Saturday and Sunday
-        if ((currentDay === 5 && currentHour >= 20) || currentDay === 6 || currentDay === 0) {
-            document.getElementById('formContainer').innerHTML = `
-                <div style="text-align:center; padding: 20px 10px; color:#dc2626;">
-                    <span style="font-size:3.5rem;">🔒</span>
-                    <h2 style="margin-top:15px; color:#0f172a;">Sign-Ups Are Closed</h2>
-                    <p style="color:#64748b; font-size:0.95rem; line-height:1.5; max-width:340px; margin: 0 auto;">
-                        Transport manifests for this upcoming Sunday locked on Friday at 20:00 (8 PM). 
-                        Please contact your administrator directly if this is an urgent emergency.
-                    </p>
-                </div>
-            `;
-            return false;
+    // FIXED STRINGS MATRIX ALIGNED TO STABLE HISTORICAL VALUES
+    const STOPS_DATA = {
+        "CBD": ["Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
+        "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
+        "Braam": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"],
+        "Auckland Park": ["UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"]
+    };
+
+    function updateStopsDropdown() {
+        const areaSelect = document.getElementById('pickupArea');
+        const stopSelect = document.getElementById('pickupLocation');
+        const chosenArea = areaSelect.value;
+
+        stopSelect.innerHTML = ''; 
+
+        if (chosenArea && STOPS_DATA[chosenArea]) {
+            stopSelect.disabled = false;
+            
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = "";
+            defaultOpt.disabled = true;
+            defaultOpt.selected = true;
+            defaultOpt.innerText = "-- Choose Specific Location --";
+            stopSelect.appendChild(defaultOpt);
+
+            STOPS_DATA[chosenArea].forEach(stop => {
+                const opt = document.createElement('option');
+                opt.value = stop;
+                opt.innerText = stop;
+                stopSelect.appendChild(opt);
+            });
+        } else {
+            stopSelect.disabled = true;
+            stopSelect.innerHTML = '<option value="" disabled selected>-- Choose Area First --</option>';
         }
-        return true;
     }
 
-    async function handleFormSubmission(event) {
-        event.preventDefault();
-        if (!verifyRegistrationWindow()) return;
+    function calculateUpcomingSunday() {
+        let today = new Date();
+        let dayOfWeek = today.getDay(); 
+        let daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        let targetSunday = new Date(today);
+        targetSunday.setDate(today.getDate() + daysUntilSunday);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.querySelectorAll('.targetSundayDate').forEach(el => {
+            el.innerText = targetSunday.toLocaleDateString('en-ZA', options);
+        });
+    }
 
-        const submitBtn = document.getElementById('submitBtn');
-        const msgBox = document.getElementById('statusNotification');
+    document.getElementById('transportForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.innerText = "Processing Your Seat...";
+        btn.disabled = true;
         
-        submitBtn.disabled = true;
-        submitBtn.innerText = "Processing...";
-        msgBox.style.display = "none";
-
-        const payload = {
+        const dataPayload = {
             name: document.getElementById('fullName').value.trim(),
-            phone: document.getElementById('phoneNumber').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
             visitor_status: document.getElementById('visitorStatus').value,
-            structure: document.getElementById('structureName').value.trim(),
-            pickup_stop: document.getElementById('pickupStop').value
+            structure: document.getElementById('structure').value.trim(),
+            pickup_stop: document.getElementById('pickupLocation').value
         };
 
         try {
-            const { error } = await supabaseClient.from('church_signups').insert([payload]);
-            if (error) throw error;
-
-            msgBox.className = "status-msg success";
-            msgBox.innerHTML = "🎉 Registration successful! See you on Sunday.";
-            msgBox.style.display = "block";
-            document.getElementById('signupForm').reset();
-        } catch (err) {
-            msgBox.className = "status-msg error";
-            msgBox.innerHTML = "❌ Submission Error: " + err.message;
-            msgBox.style.display = "block";
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerText = "Submit Registration";
+            const { error } = await churchDb.from('church_signups').insert([dataPayload]);
+            if (error) {
+                alert("❌ Booking Error:\n" + error.message);
+                btn.innerText = "Confirm My Seat & Agree to R40";
+                btn.disabled = false;
+            } else {
+                document.getElementById('paymentRef').innerText = `${dataPayload.name.replace(/\s+/g, '').toUpperCase()}SUN`;
+                document.getElementById('bookingScreen').style.display = 'none';
+                document.getElementById('confirmationScreen').style.display = 'block';
+            }
+        } catch(catchErr) {
+            alert("❌ Connection timed out. Please try again.");
+            btn.disabled = false;
         }
-    }
+    });
 
-    // Initialize application script parameters
-    if (verifyRegistrationWindow()) {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
+    calculateUpcomingSunday();
 </script>
 </body>
 </html>
