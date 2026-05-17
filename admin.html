@@ -1,706 +1,706 @@
-1. <!DOCTYPE html>
-2. <html lang="en">
-3. <head>
-4.     <meta charset="UTF-8">
-5.     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-6.     <title>Transport Administration Console</title>
-7.     
-8.     <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
-9.     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
-10.     
-11.     <!-- Include Supabase Core Cloud Library -->
-12.     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-13.     <style>
-14.         :root {
-15.             --primary: #1e40af;
-16.             --success: #059669;
-17.             --bg: #f8fafc;
-18.             --card: #ffffff;
-19.             --text: #334155;
-20.             --error: #dc2626;
-21.             --limbo-bg: #fff1f2;
-22.             --limbo-border: #fecdd3;
-23.             --limbo-text: #9f1239;
-24.             --warning-bg: #fffbeb;
-25.             --warning-text: #92400e;
-26.             --warning-border: #fcd34d;
-27.         }
-28.         body {
-29.             font-family: system-ui, -apple-system, sans-serif;
-30.             background-color: var(--bg);
-31.             color: var(--text);
-32.             margin: 0;
-33.             padding: 15px;
-34.         }
-35.         .container { max-width: 950px; margin: 0 auto; }
-36.         .card {
-37.             background: var(--card);
-38.             padding: 24px;
-39.             border-radius: 12px;
-40.             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-41.             margin-bottom: 20px;
-42.         }
-43.         h2, h3 { margin-top: 0; color: #0f172a; }
-44.         .diagnostic-box {
-45.             background-color: #f1f5f9;
-46.             border: 2px dashed #94a3b8;
-47.             padding: 15px;
-48.             border-radius: 8px;
-49.             margin-bottom: 20px;
-50.             font-family: monospace;
-51.         }
-52.         .status-good { color: var(--success); font-weight: bold; }
-53.         .status-bad { color: var(--error); font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 6px; }
-54.         .date-badge {
-55.             display: inline-block;
-56.             background-color: #eff6ff;
-57.             color: #1e40af;
-58.             padding: 6px 12px;
-59.             border-radius: 20px;
-60.             font-weight: bold;
-61.             font-size: 0.9rem;
-62.             margin-bottom: 15px;
-63.         }
-64.         
-65.         /* NOTES APP ACCORDION STYLES */
-66.         .vehicle-block {
-67.             background: var(--card);
-68.             border: 1px solid #cbd5e1;
-69.             margin-bottom: 15px;
-70.             border-radius: 8px;
-71.             overflow: hidden;
-72.             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-73.         }
-74.         .vehicle-header-trigger {
-75.             background: #f8fafc;
-76.             padding: 16px;
-77.             display: flex;
-78.             justify-content: space-between;
-79.             align-items: center;
-80.             cursor: pointer;
-81.             user-select: none;
-82.             transition: background 0.2s;
-83.             border-left: 6px solid var(--success);
-84.         }
-85.         .vehicle-header-trigger:hover { background: #f1f5f9; }
-86.         .vehicle-title {
-87.             color: #065f46;
-88.             font-weight: bold;
-89.             font-size: 1.15rem;
-90.             display: flex;
-91.             align-items: center;
-92.             gap: 10px;
-93.         }
-94.         .toggle-status-badge {
-95.             font-size: 0.85rem;
-96.             background: #e2e8f0;
-97.             color: #475569;
-98.             padding: 4px 10px;
-99.             border-radius: 6px;
-100.             font-weight: bold;
-101.         }
-102.         .vehicle-collapsible-content {
-103.             display: none; 
-104.             padding: 20px;
-105.             border-top: 1px solid #cbd5e1;
-106.             background: var(--card);
-107.         }
-108.         
-109.         /* NOTES APP DROPROW STYLE FOR LIMBO */
-110.         .limbo-block {
-111.             background: var(--limbo-bg);
-112.             border: 1px solid var(--limbo-border);
-113.             margin-top: 35px;
-114.             margin-bottom: 30px;
-115.             border-radius: 8px;
-116.             overflow: hidden;
-117.             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-118.         }
-119.         .limbo-header-trigger {
-120.             background: #ffe4e6;
-121.             padding: 16px;
-122.             display: flex;
-123.             justify-content: space-between;
-124.             align-items: center;
-125.             cursor: pointer;
-126.             user-select: none;
-127.             border-left: 6px solid var(--error);
-128.         }
-129.         .limbo-header-trigger:hover { background: #fecdd3; }
-130.         .limbo-title {
-131.             color: var(--limbo-text);
-132.             font-weight: bold;
-133.             font-size: 1.15rem;
-134.         }
-135.         .limbo-collapsible-content {
-136.             display: none; 
-137.             padding: 20px;
-138.             border-top: 1px solid var(--limbo-border);
-139.             background: #fff1f2;
-140.         }
-141. 
-142.         .stop-summary-inline {
-143.             background: #f1f5f9;
-144.             padding: 12px;
-145.             border-radius: 6px;
-146.             font-size: 0.9rem;
-147.             margin-bottom: 15px;
-148.             color: #475569;
-149.             line-height: 1.4;
-150.         }
-151.         .cross-rider-tag {
-152.             background: #fef3c7;
-153.             color: var(--warning-text);
-154.             border: 1px solid var(--warning-border);
-155.             font-size: 0.75rem;
-156.             padding: 2px 6px;
-157.             border-radius: 4px;
-158.             font-weight: bold;
-159.             margin-left: 8px;
-160.         }
-161.         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
-162.         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; color: #334155; }
-163.         th { background: #f8fafc; color: #475569; font-weight: 600; }
-164.         .delete-btn {
-165.             background: #fee2e2;
-166.             color: #b91c1c;
-167.             border: 1px solid #fca5a5;
-168.             padding: 4px 8px;
-169.             border-radius: 4px;
-170.             cursor: pointer;
-171.             font-weight: bold;
-172.         }
-173.         .refresh-btn {
-174.             background: var(--success);
-175.             color: white;
-176.             border: none;
-177.             padding: 12px 20px;
-178.             border-radius: 8px;
-179.             font-weight: bold;
-180.             cursor: pointer;
-181.             font-size: 1rem;
-182.         }
-183. 
-184.         /* CUSTOM MODAL OVERLAYS */
-185.         .modal-overlay {
-186.             display: none;
-187.             position: fixed;
-188.             top: 0; left: 0; width: 100%; height: 100%;
-189.             background: rgba(15, 23, 42, 0.6);
-190.             backdrop-filter: blur(4px);
-191.             z-index: 99999;
-192.             box-sizing: border-box;
-193.         }
-194.         .modal-card {
-195.             background: white;
-196.             max-width: 440px;
-197.             margin: 15% auto;
-198.             padding: 28px;
-199.             border-radius: 16px;
-200.             box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-201.             border: 1px solid #e2e8f0;
-202.         }
-203.         .modal-input {
-204.             width: 100%;
-205.             padding: 12px;
-206.             border: 1.5px solid #cbd5e1;
-207.             border-radius: 8px;
-208.             font-size: 1rem;
-209.             margin-top: 10px;
-210.             margin-bottom: 8px;
-211.             box-sizing: border-box;
-212.         }
-213.     </style>
-214. </head>
-215. <body>
-216. 
-217. <div class="container">
-218. 
-219.     <!-- DATABASE MONITOR SYNC STATUS -->
-220.     <div class="diagnostic-box">
-221.         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
-222.         <div id="diagnosticStatus" class="status-good">Connecting...</div>
-223.     </div>
-224. 
-225.     <!-- MAIN ACTIVE ROSTERS PANEL -->
-226.     <div class="card">
-227.         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
-228.         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-229.         <p style="margin-bottom: 20px;">Total Unique Sign-Ups: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
-230.         
-231.         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
-232.         <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
-233.         
-234.         <div id="manifestContainer" style="margin-top: 20px;"></div>
-235.     </div>
-236. 
-237.     <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
-238.     <div id="limboSectionContainer"></div>
-239. 
-240. </div>
-241. 
-242. <!-- SECURITY MODAL DIALOG CONTAINER PORTAL -->
-243. <div id="customSecurityModal" class="modal-overlay">
-244.     <div class="modal-card">
-245.         <h3 style="margin-top:0; color:#0f172a;">🔒 Security Verification</h3>
-246.         <p style="margin: 0; font-size:0.95rem; color:#475569;">
-247.             To completely remove <strong id="targetPassengerNameText">Passenger</strong> from the live cloud database, please verify your administrative clearance.
-248.         </p>
-249.         <input type="password" id="modalPasswordInputField" class="modal-input" placeholder="Enter administrative password">
-250.         <div id="modalErrorMessageBox" style="color:var(--error); font-size: 0.85rem; font-weight: bold; display: none; margin-bottom: 12px;">❌ Incorrect Password. Access Denied.</div>
-251.         <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 15px;">
-252.             <button class="refresh-btn" style="background:#64748b; padding:10px 16px;" onclick="closeSecurityModalGate()">Cancel</button>
-253.             <button class="refresh-btn" style="padding:10px 16px;" onclick="executeSecureCloudDeletion()">Verify & Remove</button>
-254.         </div>
-255.     </div>
-256. </div>
-257. 
-258. <script>
-259.     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
-260.     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
-261.     const ADMIN_PASSWORD = "Church2026"; 
-262.     const TAXI_CAPACITY = 17;
-263.     const MIN_PASSENGER_FLOOR = 14;
-264. 
-265.     // MASTER CHRONOLOGICAL PATH SEQUENCE
-266.     const MASTER_ROUTE_SEQUENCE = [
-267.         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
-268.         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
-269.         "Braam", "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
-270.     ];
-271. 
-272.     const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
-273. 
-274.     const AREA_MAPPING = {
-275.         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
-276.         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
-277.         "Braam": "Braam Route",
-278.         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
-279.     };
-280. 
-281.     let churchDb = null;
-282.     let pendingDeletionId = null;
-283.     let pendingDeletionName = null;
-284. 
-285.     function initializeAdmin() {
-286.         try {
-287.             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-288.             document.getElementById('diagnosticStatus').innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
-289.             fetchAndCompileLogistics();
-290.             calculateUpcomingSunday();
-291.         } catch(err) {
-292.             document.getElementById('diagnosticStatus').className = "status-bad";
-293.             document.getElementById('diagnosticStatus').innerHTML = "🚨 Connection Error: " + err.message;
-294.         }
-295.     }
-296. 
-297.     function calculateUpcomingSunday() {
-298.         let today = new Date();
-299.         let dayOfWeek = today.getDay(); 
-300.         let daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-301.         let targetSunday = new Date(today);
-302.         targetSunday.setDate(today.getDate() + daysUntilSunday);
-303.         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-304.         document.querySelectorAll('.targetSundayDate').forEach(el => {
-305.             el.innerText = targetSunday.toLocaleDateString('en-ZA', options);
-306.         });
-307.     }
-308. 
-309.     function toggleTaxiView(globalId) {
-310.         const targetContentBlock = document.getElementById(`taxi-content-${globalId}`);
-311.         const targetBadge = document.getElementById(`taxi-badge-${globalId}`);
-312.         if (targetContentBlock.style.display === "block") {
-313.             targetContentBlock.style.display = "none";
-314.             targetBadge.innerText = "▼ Show List";
-315.             targetBadge.style.background = "#e2e8f0";
-316.             targetBadge.style.color = "#475569";
-317.         } else {
-318.             targetContentBlock.style.display = "block";
-319.             targetBadge.innerText = "▲ Hide List";
-320.             targetBadge.style.background = "#dcfce7";
-321.             targetBadge.style.color = "#15803d";
-322.         }
-323.     }
-324. 
-325.     function toggleLimboView() {
-326.         const targetContentBlock = document.getElementById('limbo-content-block');
-327.         const targetBadge = document.getElementById('limbo-toggle-badge');
-328.         if (targetContentBlock.style.display === "block") {
-329.             targetContentBlock.style.display = "none";
-330.             targetBadge.innerText = "▼ Show List";
-331.             targetBadge.style.background = "#e2e8f0";
-332.             targetBadge.style.color = "#475569";
-333.         } else {
-334.             targetContentBlock.style.display = "block";
-335.             targetBadge.innerText = "▲ Hide List";
-336.             targetBadge.style.background = "#ffe4e6";
-337.             targetBadge.style.color = "#9f1239";
-338.         }
-339.     }
-340. 
-341.     function findPerfectSubset(stopGroups, targetCapacity) {
-342.         for (let i = 1; i < (1 << stopGroups.length); i++) {
-343.             let sum = 0;
-344.             let subset = [];
-345.             for (let j = 0; j < stopGroups.length; j++) {
-346.                 if (i & (1 << j)) {
-347.                     sum += stopGroups[j].passengers.length;
-348.                     subset.push(stopGroups[j]);
-349.                 }
-350.             }
-351.             if (sum === targetCapacity) return subset;
-352.         }
-353.         return null;
-354.     }
-355. 
-356.     async function fetchAndCompileLogistics() {
-357.         try {
-358.             const { data: records, error } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
-359.             if (error) {
-360.                 document.getElementById('diagnosticStatus').className = "status-bad";
-361.                 document.getElementById('diagnosticStatus').innerHTML = "🚨 Database Error: " + error.message;
-362.                 return;
-363.             }
-364. 
-365.             // PASS 0: AUTOMATIC REAL-TIME CASE-INSENSITIVE DEDUPLICATION
-366.             let uniqueSeenNames = new Set();
-367.             let deduplicatedRecords = [];
-368.             records.forEach(r => {
-369.                 let cleanedNameKey = r.name ? r.name.trim().toLowerCase() : "";
-370.                 if (cleanedNameKey && !uniqueSeenNames.has(cleanedNameKey)) {
-371.                     uniqueSeenNames.add(cleanedNameKey);
-372.                     deduplicatedRecords.push(r);
-373.                 }
-374.             });
-375. 
-376.             document.getElementById('totalCount').innerText = deduplicatedRecords.length;
-377. 
-378.             const manifestContainer = document.getElementById('manifestContainer');
-379.             const limboSectionContainer = document.getElementById('limboSectionContainer');
-380.             manifestContainer.innerHTML = '';
-381.             limboSectionContainer.innerHTML = '';
-382. 
-383.             if(deduplicatedRecords.length === 0) {
-384.                 manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
-385.                 return;
-386.             }
-387. 
-388.             // DATA NORMALIZATION & STRING HARMONIZATION PIPELINE
-389.             let workingPool = deduplicatedRecords.map(r => {
-390.                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
-391.                 
-392.                 if (dbStopRaw.toLowerCase() === "ghandi" || dbStopRaw.toLowerCase() === "ghandi square") dbStopRaw = "Ghandi Square";
-393.                 if (dbStopRaw.toLowerCase() === "education" || dbStopRaw.toLowerCase() === "education campus") dbStopRaw = "Education Campus";
-394.                 if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
-395.                 if (dbStopRaw.toLowerCase() === "uj bunting") dbStopRaw = "UJ Bunting";
-396. 
-397.                 let displayStop = dbStopRaw;
-398.                 if (EXCLUSIVE_BRAAM_STOPS.some(s => s.toLowerCase() === dbStopRaw.toLowerCase())) {
-399.                     displayStop = "Braam";
-400.                 }
-401. 
-402.                 let mappedArea = "Unknown Route";
-403.                 for (let [stopKey, areaValue] of Object.entries(AREA_MAPPING)) {
-404.                     if (stopKey.toLowerCase() === displayStop.toLowerCase()) {
-405.                         displayStop = stopKey; 
-406.                         mappedArea = areaValue;
-407.                         break;
-408.                     }
-409.                 }
-410.                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
-411.             });
-412. 
-413.             let finalizedTaxis = [];
-414. 
-415.             // PASS 1: EXRACT STOPS EXCEEDING VEHICLE CAPACITY LIMITS (>=17)
-416.             MASTER_ROUTE_SEQUENCE.forEach(sName => {
-417.                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-418.                 while (matchingRiders.length >= TAXI_CAPACITY) {
-419.                     let fullBatch = matchingRiders.splice(0, TAXI_CAPACITY);
-420.                     fullBatch.forEach(p => p.assigned = true);
-421.                     finalizedTaxis.push({ passengers: fullBatch });
-422.                 }
-423.             });
-424. 
-425.             // PASS 2: INTRA-AREA COHESION MATCHING (Finds exact 17-seat group fits internally inside areas)
-426.             let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
-427.             uniqueAreas.forEach(areaName => {
-428.                 let perfectMatchFound = true;
-429.                 while (perfectMatchFound) {
-430.                     let unassignedAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
-431.                     let activeStops = [];
-432.                     MASTER_ROUTE_SEQUENCE.forEach(sName => {
-433.                         let stopRiders = unassignedAreaRiders.filter(p => p.displayStop === sName);
-434.                         if (stopRiders.length > 0) activeStops.push({ stopName: sName, passengers: stopRiders });
-435.                     });
-436. 
-437.                     let targetSubset = findPerfectSubset(activeStops, TAXI_CAPACITY);
-438.                     if (targetSubset) {
-439.                         let taxiContent = [];
-440.                         targetSubset.forEach(group => {
-441.                             group.passengers.forEach(p => { p.assigned = true; taxiContent.push(p); });
-442.                         });
-443.                         finalizedTaxis.push({ passengers: taxiContent });
-444.                     } else {
-445.                         perfectMatchFound = false;
-446.                     }
-447.                 }
-448.             });
-449. 
-450.             // PASS 3: STANDALONE REGIONAL SURVIVAL CHECK (If remaining area riders total 14-17, keep them purely together)
-451.             uniqueAreas.forEach(areaName => {
-452.                 let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
-453.                 if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
-454.                     remainingAreaRiders.forEach(p => p.assigned = true);
-455.                     finalizedTaxis.push({ passengers: remainingAreaRiders });
-456.                 }
-457.             });
-458. 
-459.             // PASS 4: ADVANCED LEFTOVER MATCHING PACKER ENGINE (Enforces priority rules on open vehicles)
-460.             let globalLeftoverStops = [];
-461.             MASTER_ROUTE_SEQUENCE.forEach(sName => {
-462.                 let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-463.                 if (unassignedRiders.length > 0) {
-464.                     globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
-465.                 }
-466.             });
-467. 
-468.             while (globalLeftoverStops.length > 0) {
-469.                 let currentStopGroup = globalLeftoverStops[0];
-470.                 let targetStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(currentStopGroup.stopName);
-471.                 
-472.                 // Track vehicles currently sitting below full 17 capacity limits
-473.                 let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
-474. 
-475.                 if (openCandidateTaxis.length === 0) {
-476.                     // No partially full vehicles exist, open a new vehicle container
-477.                     let newTaxi = { passengers: [] };
-478.                     let sliceBatch = currentStopGroup.passengers.splice(0, TAXI_CAPACITY);
-479.                     sliceBatch.forEach(p => p.assigned = true);
-480.                     newTaxi.passengers.push(...sliceBatch);
-481.                     finalizedTaxis.push(newTaxi);
-482.                     
-483.                     if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
-484.                 } else {
-485.                     // Apply priority hierarchy criteria to select the best vehicle target
-486.                     openCandidateTaxis.forEach(taxi => {
-487.                         let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
-488.                         
-489.                         // Rule Part A: Count unique stops currently in the vehicle's run
-490.                         taxi._stopsCount = uniqueStopsInTaxi.size;
-491.                         
-492.                         // Rule Part B: Locate index position of the vehicle's last stop assignment
-493.                         let maxSequenceIndex = -1;
-494.                         uniqueStopsInTaxi.forEach(st => {
-495.                             let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
-496.                             if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
-497.                         });
-498.                         
-499.                         // Calculate absolute geographic sequence step distance
-500.                         taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
-501.                     });
-502. 
-503.                     // Sort candidate vehicles based on your precise ranking specifications
-504.                     openCandidateTaxis.sort((a, b) => {
-505.                         if (a._stopsCount !== b._stopsCount) {
-506.                             return a._stopsCount - b._stopsCount; // Least amount of unique stops first
-507.                         }
-508.                         return a._distanceToTarget - b._distanceToTarget; // Closest index distance layout next
-509.                     });
-510. 
-511.                     // Pack the highest ranking target vehicle
-512.                     let optimalTaxiTarget = openCandidateTaxis[0];
-513.                     let remainingSeats = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
-514.                     let sliceBatch = currentStopGroup.passengers.splice(0, remainingSeats);
-515.                     sliceBatch.forEach(p => p.assigned = true);
-516.                     optimalTaxiTarget.passengers.push(...sliceBatch);
-517. 
-518.                     if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
-519.                 }
-520.             }
-521. 
-522.             // Post-processing cleanup pass: Ensure ALL finalized vehicles meet the minimum safety floor bounds
-523.             finalizedTaxis = finalizedTaxis.filter(taxi => {
-524.                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-525.                     return true;
-526.                 } else {
-527.                     // Release passengers back to unassigned status so they populate Limbo automatically
-528.                     taxi.passengers.forEach(p => p.assigned = false);
-529.                     return false;
-530.                 }
-531.             });
-532. 
-533.             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
-534.             let globalTaxiCounter = 1;
-535. 
-536.             // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
-537.             finalizedTaxis.forEach(taxi => {
-538.                 let runningGlobalId = globalTaxiCounter++;
-539.                 const vehicleBlockElement = document.createElement('div');
-540.                 vehicleBlockElement.className = 'vehicle-block';
-541. 
-542.                 // Core Area Calculation
-543.                 let areaTallyMap = {};
-544.                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
-545.                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
-546. 
-547.                 // DYNAMIC HEADERS DESIGN PIPELINE
-548.                 let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
-549.                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
-550.                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
-551.                     ? `${cleanAreaLabelName} (Mixed) Manifest` 
-552.                     : `${majorityArea} Manifest`;
-553. 
-554.                 let countSummaryMap = {};
-555.                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
-556.                 
-557.                 let routePlanStrings = [];
-558.                 MASTER_ROUTE_SEQUENCE.forEach(sName => {
-559.                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
-560.                 });
-561. 
-562.                 let tableRowsHtml = '';
-563.                 let passengerIndexCounter = 1;
-564. 
-565.                 MASTER_ROUTE_SEQUENCE.forEach(sName => {
-566.                     let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
-567.                     stopPassengers.forEach(r => {
-568.                         let isMinorityRider = r.sourceArea !== majorityArea;
-569.                         let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
-570.                         let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
-571. 
-572.                         tableRowsHtml += `
-573.                             <tr ${crossRowStyle}>
-574.                                 <td><strong>${passengerIndexCounter++}.</strong></td>
-575.                                 <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
-576.                                 <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
-577.                                 <td>${r.phone}</td>
-578.                                 <td>${r.visitor_status}</td>
-579.                                 <td>${r.structure}</td>
-580.                                 <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
-581.                             </tr>
-582.                         `;
-583.                     });
-584.                 });
-585. 
-586.                 vehicleBlockElement.innerHTML = `
-587.                     <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
-588.                         <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
-589.                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
-590.                     </div>
-591.                     <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
-592.                         <div class="stop-summary-inline"><strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}</div>
-593.                         <div style="max-width:100%; overflow-x:auto;">
-594.                             <table>
-595.                                 <thead>
-596.                                     <tr><th style="width:40px;">#</th><th>Stop Location</th><th>Passenger Name</th><th>Phone</th><th>Classification</th><th>Structure</th><th>Action</th></tr>
-597.                                 </thead>
-598.                                 <tbody>${tableRowsHtml}</tbody>
-599.                             </table>
-600.                         </div>
-601.                     </div>
-602.                 `;
-603.                 manifestContainer.appendChild(vehicleBlockElement);
-604.             });
-605. 
-606.             // PHASE 6: UNASSIGNED LIMBO ACCORDION GENERATION
-607.             if (globalLimboPassengers.length > 0) {
-608.                 const limboDiv = document.createElement('div');
-609.                 limboDiv.className = 'limbo-block';
-610.                 let limboRowsHtml = '';
-611.                 let limboIndexCounter = 1;
-612. 
-613.                 globalLimboPassengers.forEach(r => {
-614.                     limboRowsHtml += `
-615.                         <tr style="background:#fff1f2;">
-616.                             <td style="color:#9f1239;"><strong>${limboIndexCounter++}.</strong></td>
-617.                             <td><span style="background:#ffe4e6; color:#9f1239; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
-618.                             <td style="color:#9f1239;"><strong>${r.name}</strong> <span style="font-weight:normal; font-size:0.8rem; color:#64748b;">(${r.sourceArea.split(' ')[0]})</span></td>
-619.                             <td style="color:#9f1239;">${r.phone}</td>
-620.                             <td style="color:#9f1239;">${r.visitor_status}</td>
-621.                             <td style="color:#9f1239;">${r.structure}</td>
-622.                             <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
-623.                         </tr>
-624.                     `;
-625.                 });
-626. 
-627.                 limboDiv.innerHTML = `
-628.                     <div class="limbo-header-trigger" onclick="toggleLimboView()">
-629.                         <div class="limbo-title">⚠️ Unassigned Passengers <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— ${globalLimboPassengers.length} in Limbo</span></div>
-630.                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
-631.                     </div>
-632.                     <div class="limbo-collapsible-content" id="limbo-content-block">
-633.                         <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers).</p>
-634.                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
-635.                             <table>
-636.                                 <thead>
-637.                                     <tr><th style="width:40px;">#</th><th>Stop Location</th><th>Name</th><th>Phone</th><th>Classification</th><th>Structure</th><th>Action</th></tr>
-638.                                 </thead>
-639.                                 <tbody>${limboRowsHtml}</tbody>
-640.                             </table>
-641.                         </div>
-642.                     </div>
-643.                 `;
-644.                 limboSectionContainer.appendChild(limboDiv);
-645.             }
-646.         } catch(err) {
-647.             alert("Exception parsing registers.");
-648.             console.error(err);
-649.         }
-650.     }
-651. 
-652.     async function downloadExcelBackup() {
-653.         try {
-654.             const { data: records, error } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
-655.             if (error) { alert("Error pulling backup: " + error.message); return; }
-656.             let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
-657.             records.forEach(r => {
-658.                 let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
-659.                 csvContent += row + "\n";
-660.             });
-661.             const encodedUri = encodeURI(csvContent);
-662.             const link = document.createElement("a");
-663.             link.setAttribute("href", encodedUri);
-664.             link.setAttribute("download", `Church_Transport_Master_Archive_${new Date().toISOString().split('T')[0]}.csv`);
-665.             document.body.appendChild(link); link.click(); document.body.removeChild(link);
-666.         } catch (err) { alert("Failed to generate report: " + err.message); }
-667.     }
-668. 
-669.     function openSecurityModalGate(passengerId, passengerName) {
-670.         pendingDeletionId = passengerId;
-671.         pendingDeletionName = passengerName;
-672.         document.getElementById('targetPassengerNameText').innerText = passengerName;
-673.         document.getElementById('modalPasswordInputField').value = "";
-674.         document.getElementById('modalErrorMessageBox').style.display = "none";
-675.         document.getElementById('customSecurityModal').style.display = "block";
-676.         document.getElementById('modalPasswordInputField').focus();
-677.     }
-678. 
-679.     function closeSecurityModalGate() {
-680.         document.getElementById('customSecurityModal').style.display = "none";
-681.         pendingDeletionId = null; pendingDeletionName = null;
-682.     }
-683. 
-684.     async function executeSecureCloudDeletion() {
-685.         const inputPasswordValue = document.getElementById('modalPasswordInputField').value;
-686.         if (inputPasswordValue === ADMIN_PASSWORD) {
-687.             document.getElementById('modalErrorMessageBox').style.display = "none";
-688.             document.getElementById('customSecurityModal').style.display = "none";
-689.             try {
-690.                 const { error } = await churchDb.from('church_signups').delete().eq('id', pendingDeletionId);
-691.                 if (error) alert("Database error: " + error.message); else fetchAndCompileLogistics();
-692.             } catch(dbErr) { alert("Network error: " + dbErr.message); }
-693.             pendingDeletionId = null; pendingDeletionName = null;
-694.         } else {
-695.             document.getElementById('modalErrorMessageBox').style.display = "block";
-696.         }
-697.     }
-698. 
-699.     document.getElementById('modalPasswordInputField').addEventListener('keyup', function(e) {
-700.         if (e.key === 'Enter') executeSecureCloudDeletion();
-701.     });
-702. 
-703.     initializeAdmin();
-704. </script>
-705. </body>
-706. </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transport Administration Console</title>
+    
+    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
+    
+    <!-- Include Supabase Core Cloud Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #1e40af;
+            --success: #059669;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #334155;
+            --error: #dc2626;
+            --limbo-bg: #fff1f2;
+            --limbo-border: #fecdd3;
+            --limbo-text: #9f1239;
+            --warning-bg: #fffbeb;
+            --warning-text: #92400e;
+            --warning-border: #fcd34d;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+        }
+        .container { max-width: 950px; margin: 0 auto; }
+        .card {
+            background: var(--card);
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        h2, h3 { margin-top: 0; color: #0f172a; }
+        .diagnostic-box {
+            background-color: #f1f5f9;
+            border: 2px dashed #94a3b8;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+        .status-good { color: var(--success); font-weight: bold; }
+        .status-bad { color: var(--error); font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 6px; }
+        .date-badge {
+            display: inline-block;
+            background-color: #eff6ff;
+            color: #1e40af;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+        
+        /* NOTES APP ACCORDION STYLES */
+        .vehicle-block {
+            background: var(--card);
+            border: 1px solid #cbd5e1;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .vehicle-header-trigger {
+            background: #f8fafc;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+            border-left: 6px solid var(--success);
+        }
+        .vehicle-header-trigger:hover { background: #f1f5f9; }
+        .vehicle-title {
+            color: #065f46;
+            font-weight: bold;
+            font-size: 1.15rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toggle-status-badge {
+            font-size: 0.85rem;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .vehicle-collapsible-content {
+            display: none; 
+            padding: 20px;
+            border-top: 1px solid #cbd5e1;
+            background: var(--card);
+        }
+        
+        /* NOTES APP DROPROW STYLE FOR LIMBO */
+        .limbo-block {
+            background: var(--limbo-bg);
+            border: 1px solid var(--limbo-border);
+            margin-top: 35px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .limbo-header-trigger {
+            background: #ffe4e6;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            border-left: 6px solid var(--error);
+        }
+        .limbo-header-trigger:hover { background: #fecdd3; }
+        .limbo-title {
+            color: var(--limbo-text);
+            font-weight: bold;
+            font-size: 1.15rem;
+        }
+        .limbo-collapsible-content {
+            display: none; 
+            padding: 20px;
+            border-top: 1px solid var(--limbo-border);
+            background: #fff1f2;
+        }
+
+        .stop-summary-inline {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            color: #475569;
+            line-height: 1.4;
+        }
+        .cross-rider-tag {
+            background: #fef3c7;
+            color: var(--warning-text);
+            border: 1px solid var(--warning-border);
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; color: #334155; }
+        th { background: #f8fafc; color: #475569; font-weight: 600; }
+        .delete-btn {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        /* CUSTOM MODAL OVERLAYS */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            box-sizing: border-box;
+        }
+        .modal-card {
+            background: white;
+            max-width: 440px;
+            margin: 15% auto;
+            padding: 28px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-top: 10px;
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- DATABASE MONITOR SYNC STATUS -->
+    <div class="diagnostic-box">
+        <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
+        <div id="diagnosticStatus" class="status-good">Connecting...</div>
+    </div>
+
+    <!-- MAIN ACTIVE ROSTERS PANEL -->
+    <div class="card">
+        <h2>🚖 Sunday Compiled Taxi Rosters</h2>
+        <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
+        <p style="margin-bottom: 20px;">Total Unique Sign-Ups: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
+        
+        <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
+        <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
+        
+        <div id="manifestContainer" style="margin-top: 20px;"></div>
+    </div>
+
+    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
+    <div id="limboSectionContainer"></div>
+
+</div>
+
+<!-- SECURITY MODAL DIALOG CONTAINER PORTAL -->
+<div id="customSecurityModal" class="modal-overlay">
+    <div class="modal-card">
+        <h3 style="margin-top:0; color:#0f172a;">🔒 Security Verification</h3>
+        <p style="margin: 0; font-size:0.95rem; color:#475569;">
+            To completely remove <strong id="targetPassengerNameText">Passenger</strong> from the live cloud database, please verify your administrative clearance.
+        </p>
+        <input type="password" id="modalPasswordInputField" class="modal-input" placeholder="Enter administrative password">
+        <div id="modalErrorMessageBox" style="color:var(--error); font-size: 0.85rem; font-weight: bold; display: none; margin-bottom: 12px;">❌ Incorrect Password. Access Denied.</div>
+        <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 15px;">
+            <button class="refresh-btn" style="background:#64748b; padding:10px 16px;" onclick="closeSecurityModalGate()">Cancel</button>
+            <button class="refresh-btn" style="padding:10px 16px;" onclick="executeSecureCloudDeletion()">Verify & Remove</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
+    const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
+    const ADMIN_PASSWORD = "Church2026"; 
+    const TAXI_CAPACITY = 17;
+    const MIN_PASSENGER_FLOOR = 14;
+
+    // MASTER CHRONOLOGICAL PATH SEQUENCE
+    const MASTER_ROUTE_SEQUENCE = [
+        "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
+        "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
+        "Braam", "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
+    ];
+
+    const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
+
+    const AREA_MAPPING = {
+        "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
+        "Braam": "Braam Route",
+        "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
+    };
+
+    let churchDb = null;
+    let pendingDeletionId = null;
+    let pendingDeletionName = null;
+
+    function initializeAdmin() {
+        try {
+            churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            document.getElementById('diagnosticStatus').innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
+            fetchAndCompileLogistics();
+            calculateUpcomingSunday();
+        } catch(err) {
+            document.getElementById('diagnosticStatus').className = "status-bad";
+            document.getElementById('diagnosticStatus').innerHTML = "🚨 Connection Error: " + err.message;
+        }
+    }
+
+    function calculateUpcomingSunday() {
+        let today = new Date();
+        let dayOfWeek = today.getDay(); 
+        let daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+        let targetSunday = new Date(today);
+        targetSunday.setDate(today.getDate() + daysUntilSunday);
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.querySelectorAll('.targetSundayDate').forEach(el => {
+            el.innerText = targetSunday.toLocaleDateString('en-ZA', options);
+        });
+    }
+
+    function toggleTaxiView(globalId) {
+        const targetContentBlock = document.getElementById(`taxi-content-${globalId}`);
+        const targetBadge = document.getElementById(`taxi-badge-${globalId}`);
+        if (targetContentBlock.style.display === "block") {
+            targetContentBlock.style.display = "none";
+            targetBadge.innerText = "▼ Show List";
+            targetBadge.style.background = "#e2e8f0";
+            targetBadge.style.color = "#475569";
+        } else {
+            targetContentBlock.style.display = "block";
+            targetBadge.innerText = "▲ Hide List";
+            targetBadge.style.background = "#dcfce7";
+            targetBadge.style.color = "#15803d";
+        }
+    }
+
+    function toggleLimboView() {
+        const targetContentBlock = document.getElementById('limbo-content-block');
+        const targetBadge = document.getElementById('limbo-toggle-badge');
+        if (targetContentBlock.style.display === "block") {
+            targetContentBlock.style.display = "none";
+            targetBadge.innerText = "▼ Show List";
+            targetBadge.style.background = "#e2e8f0";
+            targetBadge.style.color = "#475569";
+        } else {
+            targetContentBlock.style.display = "block";
+            targetBadge.innerText = "▲ Hide List";
+            targetBadge.style.background = "#ffe4e6";
+            targetBadge.style.color = "#9f1239";
+        }
+    }
+
+    function findPerfectSubset(stopGroups, targetCapacity) {
+        for (let i = 1; i < (1 << stopGroups.length); i++) {
+            let sum = 0;
+            let subset = [];
+            for (let j = 0; j < stopGroups.length; j++) {
+                if (i & (1 << j)) {
+                    sum += stopGroups[j].passengers.length;
+                    subset.push(stopGroups[j]);
+                }
+            }
+            if (sum === targetCapacity) return subset;
+        }
+        return null;
+    }
+
+    async function fetchAndCompileLogistics() {
+        try {
+            const { data: records, error } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
+            if (error) {
+                document.getElementById('diagnosticStatus').className = "status-bad";
+                document.getElementById('diagnosticStatus').innerHTML = "🚨 Database Error: " + error.message;
+                return;
+            }
+
+            // PASS 0: AUTOMATIC REAL-TIME CASE-INSENSITIVE DEDUPLICATION
+            let uniqueSeenNames = new Set();
+            let deduplicatedRecords = [];
+            records.forEach(r => {
+                let cleanedNameKey = r.name ? r.name.trim().toLowerCase() : "";
+                if (cleanedNameKey && !uniqueSeenNames.has(cleanedNameKey)) {
+                    uniqueSeenNames.add(cleanedNameKey);
+                    deduplicatedRecords.push(r);
+                }
+            });
+
+            document.getElementById('totalCount').innerText = deduplicatedRecords.length;
+
+            const manifestContainer = document.getElementById('manifestContainer');
+            const limboSectionContainer = document.getElementById('limboSectionContainer');
+            manifestContainer.innerHTML = '';
+            limboSectionContainer.innerHTML = '';
+
+            if(deduplicatedRecords.length === 0) {
+                manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
+                return;
+            }
+
+            // DATA NORMALIZATION & STRING HARMONIZATION PIPELINE
+            let workingPool = deduplicatedRecords.map(r => {
+                let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
+                
+                if (dbStopRaw.toLowerCase() === "ghandi" || dbStopRaw.toLowerCase() === "ghandi square") dbStopRaw = "Ghandi Square";
+                if (dbStopRaw.toLowerCase() === "education" || dbStopRaw.toLowerCase() === "education campus") dbStopRaw = "Education Campus";
+                if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
+                if (dbStopRaw.toLowerCase() === "uj bunting") dbStopRaw = "UJ Bunting";
+
+                let displayStop = dbStopRaw;
+                if (EXCLUSIVE_BRAAM_STOPS.some(s => s.toLowerCase() === dbStopRaw.toLowerCase())) {
+                    displayStop = "Braam";
+                }
+
+                let mappedArea = "Unknown Route";
+                for (let [stopKey, areaValue] of Object.entries(AREA_MAPPING)) {
+                    if (stopKey.toLowerCase() === displayStop.toLowerCase()) {
+                        displayStop = stopKey; 
+                        mappedArea = areaValue;
+                        break;
+                    }
+                }
+                return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
+            });
+
+            let finalizedTaxis = [];
+
+            // PASS 1: EXRACT STOPS EXCEEDING VEHICLE CAPACITY LIMITS (>=17)
+            MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
+                while (matchingRiders.length >= TAXI_CAPACITY) {
+                    let fullBatch = matchingRiders.splice(0, TAXI_CAPACITY);
+                    fullBatch.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: fullBatch });
+                }
+            });
+
+            // PASS 2: INTRA-AREA COHESION MATCHING (Finds exact 17-seat group fits internally inside areas)
+            let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
+            uniqueAreas.forEach(areaName => {
+                let perfectMatchFound = true;
+                while (perfectMatchFound) {
+                    let unassignedAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
+                    let activeStops = [];
+                    MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                        let stopRiders = unassignedAreaRiders.filter(p => p.displayStop === sName);
+                        if (stopRiders.length > 0) activeStops.push({ stopName: sName, passengers: stopRiders });
+                    });
+
+                    let targetSubset = findPerfectSubset(activeStops, TAXI_CAPACITY);
+                    if (targetSubset) {
+                        let taxiContent = [];
+                        targetSubset.forEach(group => {
+                            group.passengers.forEach(p => { p.assigned = true; taxiContent.push(p); });
+                        });
+                        finalizedTaxis.push({ passengers: taxiContent });
+                    } else {
+                        perfectMatchFound = false;
+                    }
+                }
+            });
+
+            // PASS 3: STANDALONE REGIONAL SURVIVAL CHECK (If remaining area riders total 14-17, keep them purely together)
+            uniqueAreas.forEach(areaName => {
+                let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
+                if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
+                    remainingAreaRiders.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: remainingAreaRiders });
+                }
+            });
+
+            // PASS 4: ADVANCED LEFTOVER MATCHING PACKER ENGINE (Enforces priority rules on open vehicles)
+            let globalLeftoverStops = [];
+            MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
+                if (unassignedRiders.length > 0) {
+                    globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
+                }
+            });
+
+            while (globalLeftoverStops.length > 0) {
+                let currentStopGroup = globalLeftoverStops[0];
+                let targetStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(currentStopGroup.stopName);
+                
+                // Track vehicles currently sitting below full 17 capacity limits
+                let openCandidateTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
+
+                if (openCandidateTaxis.length === 0) {
+                    // No partially full vehicles exist, open a new vehicle container
+                    let newTaxi = { passengers: [] };
+                    let sliceBatch = currentStopGroup.passengers.splice(0, TAXI_CAPACITY);
+                    sliceBatch.forEach(p => p.assigned = true);
+                    newTaxi.passengers.push(...sliceBatch);
+                    finalizedTaxis.push(newTaxi);
+                    
+                    if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
+                } else {
+                    // Apply priority hierarchy criteria to select the best vehicle target
+                    openCandidateTaxis.forEach(taxi => {
+                        let uniqueStopsInTaxi = new Set(taxi.passengers.map(p => p.displayStop));
+                        
+                        // Rule Part A: Count unique stops currently in the vehicle's run
+                        taxi._stopsCount = uniqueStopsInTaxi.size;
+                        
+                        // Rule Part B: Locate index position of the vehicle's last stop assignment
+                        let maxSequenceIndex = -1;
+                        uniqueStopsInTaxi.forEach(st => {
+                            let seqIdx = MASTER_ROUTE_SEQUENCE.indexOf(st);
+                            if (seqIdx > maxSequenceIndex) maxSequenceIndex = seqIdx;
+                        });
+                        
+                        // Calculate absolute geographic sequence step distance
+                        taxi._distanceToTarget = Math.abs(maxSequenceIndex - targetStopIndex);
+                    });
+
+                    // Sort candidate vehicles based on your precise ranking specifications
+                    openCandidateTaxis.sort((a, b) => {
+                        if (a._stopsCount !== b._stopsCount) {
+                            return a._stopsCount - b._stopsCount; // Least amount of unique stops first
+                        }
+                        return a._distanceToTarget - b._distanceToTarget; // Closest index distance layout next
+                    });
+
+                    // Pack the highest ranking target vehicle
+                    let optimalTaxiTarget = openCandidateTaxis[0];
+                    let remainingSeats = TAXI_CAPACITY - optimalTaxiTarget.passengers.length;
+                    let sliceBatch = currentStopGroup.passengers.splice(0, remainingSeats);
+                    sliceBatch.forEach(p => p.assigned = true);
+                    optimalTaxiTarget.passengers.push(...sliceBatch);
+
+                    if (currentStopGroup.passengers.length === 0) globalLeftoverStops.shift();
+                }
+            }
+
+            // Post-processing cleanup pass: Ensure ALL finalized vehicles meet the minimum safety floor bounds
+            finalizedTaxis = finalizedTaxis.filter(taxi => {
+                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    return true;
+                } else {
+                    // Release passengers back to unassigned status so they populate Limbo automatically
+                    taxi.passengers.forEach(p => p.assigned = false);
+                    return false;
+                }
+            });
+
+            let globalLimboPassengers = workingPool.filter(p => !p.assigned);
+            let globalTaxiCounter = 1;
+
+            // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
+            finalizedTaxis.forEach(taxi => {
+                let runningGlobalId = globalTaxiCounter++;
+                const vehicleBlockElement = document.createElement('div');
+                vehicleBlockElement.className = 'vehicle-block';
+
+                // Core Area Calculation
+                let areaTallyMap = {};
+                taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
+                let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
+
+                // DYNAMIC HEADERS DESIGN PIPELINE
+                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
+                let cleanAreaLabelName = majorityArea.replace(" Route", "");
+                let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
+                    ? `${cleanAreaLabelName} (Mixed) Manifest` 
+                    : `${majorityArea} Manifest`;
+
+                let countSummaryMap = {};
+                taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
+                
+                let routePlanStrings = [];
+                MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                    if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
+                });
+
+                let tableRowsHtml = '';
+                let passengerIndexCounter = 1;
+
+                MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                    let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
+                    stopPassengers.forEach(r => {
+                        let isMinorityRider = r.sourceArea !== majorityArea;
+                        let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
+                        let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
+
+                        tableRowsHtml += `
+                            <tr ${crossRowStyle}>
+                                <td><strong>${passengerIndexCounter++}.</strong></td>
+                                <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
+                                <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
+                                <td>${r.phone}</td>
+                                <td>${r.visitor_status}</td>
+                                <td>${r.structure}</td>
+                                <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
+                            </tr>
+                        `;
+                    });
+                });
+
+                vehicleBlockElement.innerHTML = `
+                    <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
+                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
+                        <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
+                    </div>
+                    <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
+                        <div class="stop-summary-inline"><strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}</div>
+                        <div style="max-width:100%; overflow-x:auto;">
+                            <table>
+                                <thead>
+                                    <tr><th style="width:40px;">#</th><th>Stop Location</th><th>Passenger Name</th><th>Phone</th><th>Classification</th><th>Structure</th><th>Action</th></tr>
+                                </thead>
+                                <tbody>${tableRowsHtml}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                manifestContainer.appendChild(vehicleBlockElement);
+            });
+
+            // PHASE 6: UNASSIGNED LIMBO ACCORDION GENERATION
+            if (globalLimboPassengers.length > 0) {
+                const limboDiv = document.createElement('div');
+                limboDiv.className = 'limbo-block';
+                let limboRowsHtml = '';
+                let limboIndexCounter = 1;
+
+                globalLimboPassengers.forEach(r => {
+                    limboRowsHtml += `
+                        <tr style="background:#fff1f2;">
+                            <td style="color:#9f1239;"><strong>${limboIndexCounter++}.</strong></td>
+                            <td><span style="background:#ffe4e6; color:#9f1239; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
+                            <td style="color:#9f1239;"><strong>${r.name}</strong> <span style="font-weight:normal; font-size:0.8rem; color:#64748b;">(${r.sourceArea.split(' ')[0]})</span></td>
+                            <td style="color:#9f1239;">${r.phone}</td>
+                            <td style="color:#9f1239;">${r.visitor_status}</td>
+                            <td style="color:#9f1239;">${r.structure}</td>
+                            <td><button class="delete-btn" onclick="openSecurityModalGate(${r.id}, '${r.name.replace(/'/g, "\\'")}')">❌ Remove</button></td>
+                        </tr>
+                    `;
+                });
+
+                limboDiv.innerHTML = `
+                    <div class="limbo-header-trigger" onclick="toggleLimboView()">
+                        <div class="limbo-title">⚠️ Unassigned Passengers <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— ${globalLimboPassengers.length} in Limbo</span></div>
+                        <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
+                    </div>
+                    <div class="limbo-collapsible-content" id="limbo-content-block">
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers).</p>
+                        <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
+                            <table>
+                                <thead>
+                                    <tr><th style="width:40px;">#</th><th>Stop Location</th><th>Name</th><th>Phone</th><th>Classification</th><th>Structure</th><th>Action</th></tr>
+                                </thead>
+                                <tbody>${limboRowsHtml}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                limboSectionContainer.appendChild(limboDiv);
+            }
+        } catch(err) {
+            alert("Exception parsing registers.");
+            console.error(err);
+        }
+    }
+
+    async function downloadExcelBackup() {
+        try {
+            const { data: records, error } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
+            if (error) { alert("Error pulling backup: " + error.message); return; }
+            let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
+            records.forEach(r => {
+                let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
+                csvContent += row + "\n";
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Church_Transport_Master_Archive_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        } catch (err) { alert("Failed to generate report: " + err.message); }
+    }
+
+    function openSecurityModalGate(passengerId, passengerName) {
+        pendingDeletionId = passengerId;
+        pendingDeletionName = passengerName;
+        document.getElementById('targetPassengerNameText').innerText = passengerName;
+        document.getElementById('modalPasswordInputField').value = "";
+        document.getElementById('modalErrorMessageBox').style.display = "none";
+        document.getElementById('customSecurityModal').style.display = "block";
+        document.getElementById('modalPasswordInputField').focus();
+    }
+
+    function closeSecurityModalGate() {
+        document.getElementById('customSecurityModal').style.display = "none";
+        pendingDeletionId = null; pendingDeletionName = null;
+    }
+
+    async function executeSecureCloudDeletion() {
+        const inputPasswordValue = document.getElementById('modalPasswordInputField').value;
+        if (inputPasswordValue === ADMIN_PASSWORD) {
+            document.getElementById('modalErrorMessageBox').style.display = "none";
+            document.getElementById('customSecurityModal').style.display = "none";
+            try {
+                const { error } = await churchDb.from('church_signups').delete().eq('id', pendingDeletionId);
+                if (error) alert("Database error: " + error.message); else fetchAndCompileLogistics();
+            } catch(dbErr) { alert("Network error: " + dbErr.message); }
+            pendingDeletionId = null; pendingDeletionName = null;
+        } else {
+            document.getElementById('modalErrorMessageBox').style.display = "block";
+        }
+    }
+
+    document.getElementById('modalPasswordInputField').addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') executeSecureCloudDeletion();
+    });
+
+    initializeAdmin();
+</script>
+</body>
+</html>
