@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
+    
+    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
+    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -58,17 +61,8 @@
             font-size: 0.9rem;
             margin-bottom: 15px;
         }
-        .lock-banner {
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-weight: bold;
-            margin-bottom: 20px;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
         
+        /* VEHICLE MANIFEST ACCORDION STYLES */
         .vehicle-block {
             background: var(--card);
             border: 1px solid #cbd5e1;
@@ -112,6 +106,7 @@
             background: var(--card);
         }
         
+        /* UNROSTERED PASSENGER BOX STYLES */
         .limbo-block {
             background: var(--limbo-bg);
             border: 1px solid var(--limbo-border);
@@ -186,6 +181,7 @@
             font-size: 1rem;
         }
 
+        /* SECURITY VERIFICATION DIALOGS */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -220,18 +216,16 @@
 
 <div class="container">
 
+    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
+    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
-        
-        <!-- REAL-TIME REGISTRATION STATUS WINDOW BANNER -->
-        <div id="cutoffStatusBanner" class="lock-banner">Checking link status...</div>
-        
         <p style="margin-bottom: 20px;">Total Unique Sign-Ups: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
         
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
@@ -240,10 +234,12 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
+    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
 </div>
 
+<!-- SECURITY MODAL DIALOG CONTAINER PORTAL -->
 <div id="customSecurityModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:#0f172a;">🔒 Security Verification</h3>
@@ -265,8 +261,9 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8;
+    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER RULE
 
+    // UPDATED ROUTE SELECTION MAPPED TO CHECKPOINTS
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -287,31 +284,11 @@
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            checkCutoffWindowStatus();
             fetchAndCompileLogistics();
             calculateUpcomingSunday();
         } catch(err) {
             document.getElementById('diagnosticStatus').className = "status-bad";
             document.getElementById('diagnosticStatus').innerHTML = "🚨 Connection Error: " + err.message;
-        }
-    }
-
-    function checkCutoffWindowStatus() {
-        const now = new Date();
-        const targetOffset = 2 * 60 * 60 * 1000;
-        const sastTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + targetOffset);
-        const currentDay = sastTime.getDay(); 
-        const currentHour = sastTime.getHours();
-        const banner = document.getElementById('cutoffStatusBanner');
-
-        if ((currentDay === 5 && currentHour >= 20) || currentDay === 6 || currentDay === 0) {
-            banner.style.backgroundColor = "#fee2e2";
-            banner.style.color = "#9f1239";
-            banner.innerHTML = "🔒 Public Registration Status: CLOSED (Cutoff reached Friday 20:00 SAST)";
-        } else {
-            banner.style.backgroundColor = "#dcfce7";
-            banner.style.color = "#166534";
-            banner.innerHTML = "🟢 Public Registration Status: OPEN (Accepting weekly entries)";
         }
     }
 
@@ -359,6 +336,7 @@
         }
     }
 
+    // CONDITIONAL ROUTE MATRIX PLANNER
     function getCustomRouteSequence(taxiStopsList) {
         let sequence = [...MASTER_ROUTE_SEQUENCE];
         if (taxiStopsList.includes("Charlotte Maxeke") && taxiStopsList.includes("Education Campus") && taxiStopsList.includes("Arteria")) {
@@ -372,6 +350,7 @@
         return sequence;
     }
 
+    // Combinatorial subset optimization engine
     function findPerfectSubset(stops, targetCapacity) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
@@ -391,6 +370,7 @@
         return null;
     }
 
+    // Tie-breaker algorithm filtering by complexity matrix and proximity indexes
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
         let minStopsCount = Math.min(...taxisList.map(t => {
             return new Set(t.passengers.map(p => p.displayStop)).size;
@@ -424,7 +404,6 @@
         try {
             statusHeader.className = "status-good";
             statusHeader.innerHTML = "🔄 Synchronizing live database rows...";
-            checkCutoffWindowStatus();
 
             const { data: records, error = null } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
             if (error) {
@@ -456,6 +435,7 @@
                 return;
             }
 
+            // TRANSLATION LAYER STRUCTURING SPECIFIC PICKUP LABELS TO CENTRAL HUB SEQUENCES
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
@@ -504,6 +484,7 @@
             });
             let allStopsList = Object.values(stopMap);
 
+            // PHASE 1: EXECUTE WHOLE REGIONAL MATCH COMBINATIONS
             let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
             uniqueAreas.forEach(areaName => {
                 let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
@@ -523,6 +504,7 @@
                 }
             });
 
+            // PHASE 2: PACK REMAINING SPILLOVERS FULFILLING CAPACITY AND THE 8-STOP BOUNDS
             let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
             remainingStops.sort((a, b) => {
                 if (a.sourceArea !== b.sourceArea) {
@@ -556,6 +538,7 @@
                 if (chosenTaxi) {
                     unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
                 } else {
+                    // TYPE-SAFE FALLBACK DISPATCH ENGINE
                     while (unassignedRiders.length > 0) {
                         let currentOpenTaxis = finalizedTaxis.filter(t => {
                             let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
@@ -584,6 +567,7 @@
                 }
             });
 
+            // PHASE 3: REMOVE MANIFESTS SHORT OF CAPACITIES (14 SEATS)
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -597,6 +581,7 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
+            // PHASE 4: UI GENERATION PIPELINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -673,6 +658,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
+            // PHASE 5: COMPILE UNASSIGNED PASSENGERS CARD CONTAINER
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
