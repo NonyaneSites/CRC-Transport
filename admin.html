@@ -261,6 +261,7 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
+    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER CONSTRAINT RULE
 
     // COMPRESSED CHRONOLOGICAL SEQUENTIAL PATH WITH MASTER HUBS
     const MASTER_ROUTE_SEQUENCE = [
@@ -336,23 +337,27 @@
         }
     }
 
-    // Combinatorial packer identifying optimal whole stop combinations hitting exactly 17
+    // Combinatorial subset packer identifying pure regional solutions that respect the 8-stop cap
     function findPerfectSubset(stops, targetCapacity) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
             let subset = [];
+            let uniqueStopsSet = new Set();
             for (let j = 0; j < stops.length; j++) {
                 if (i & (1 << j)) {
                     sum += stops[j].passengers.length;
                     subset.push(stops[j]);
+                    uniqueStopsSet.add(stops[j].stopName);
                 }
             }
-            if (sum === targetCapacity) return subset;
+            if (sum === targetCapacity && uniqueStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT) {
+                return subset;
+            }
         }
         return null;
     }
 
-    // Advanced tie breaker enforcing minimum stop complexity and index proximity rules
+    // Tie breaker engine enforcing minimum existing complexity and chronological closeness
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
         let minStopsCount = Math.min(...taxisList.map(t => {
             return new Set(t.passengers.map(p => p.displayStop)).size;
@@ -394,7 +399,7 @@
                 return;
             }
 
-            // PASS 0: AUTOMATIC CLOUD INGESTION DE-DUPLICATION
+            // PASS 0: AUTOMATIC REAL-TIME DE-DUPLICATION PIPELINE
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -418,11 +423,10 @@
                 return;
             }
 
-            // CONSOLIDATION LAYER FOR BRAAM SUPER-HUBS AND SUB-STOPS
+            // DATA NORMALIZATION LAYER FOR BRAAM SUPER-HUBS AND GENERAL PICKUPS
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
-                // Consolidation Logic Rules applied directly
                 if (["56 jorissen", "amani", "apex", "student digzz", "ymca", "braam"].includes(dbStopRaw)) {
                     dbStopRaw = "braam";
                 } else if (["amic deck", "gate 7"].includes(dbStopRaw)) {
@@ -452,7 +456,7 @@
 
             let finalizedTaxis = [];
 
-            // COMPILE LOCAL PASSENGER LIST GROUPS
+            // AGGREGATE WORKPOOL RIDER LISTS INTO STOP GROUPS
             let stopMap = {};
             workingPool.forEach(p => {
                 if (!stopMap[p.displayStop]) {
@@ -467,7 +471,7 @@
             });
             let allStopsList = Object.values(stopMap);
 
-            // PHASE 1: PROCESS WHOLE SUBSETS FORMING EXACTLY 17 SEATS WITHIN SAME REIGON
+            // PHASE 1: SEARCH REGIONAL PURE SUBSETS FULFILLING 17 SEATS & UNDER 8 STOPS
             let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
             uniqueAreas.forEach(areaName => {
                 let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
@@ -487,7 +491,7 @@
                 }
             });
 
-            // PHASE 2: GREEDY ALLOCATION WITH CRITICAL UNFILLED TAXI CONFIGURATIONS
+            // PHASE 2: GREEDY STRATEGY FILTERED BY SEAT SPACE AND THE 8 UNIQUE STOP CONSTRAINT
             let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
             remainingStops.sort((a, b) => {
                 if (a.sourceArea !== b.sourceArea) {
@@ -501,46 +505,61 @@
                 if (unassignedRiders.length === 0) return;
 
                 let P = unassignedRiders.length;
-                let openTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
-                let chosenTaxi = null;
+                
+                // CRITICAL FILTER: Lock out any taxi that violates capacity OR exceeds 8 stops upon adding this stop
+                let openTaxis = finalizedTaxis.filter(t => {
+                    let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
+                    currentStopsSet.add(stop.stopName);
+                    
+                    let hasSeatCapacity = (TAXI_CAPACITY - t.passengers.length) >= P;
+                    let respectsStopLimit = currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
+                    
+                    return hasSeatCapacity && respectsStopLimit;
+                });
 
+                let chosenTaxi = null;
                 if (openTaxis.length > 0) {
-                    // Match Exact Remaining Open Capacity Block Space 
                     let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
                     if (perfectFitTaxis.length > 0) {
                         chosenTaxi = selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex);
                     } else {
-                        // Standard Cap Match Applying Proximity/Least Stop Rule
-                        let candidateTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) >= P);
-                        if (candidateTaxis.length > 0) {
-                            chosenTaxi = selectBestTaxiByRules(candidateTaxis, stop.sequenceIndex);
-                        }
+                        chosenTaxi = selectBestTaxiByRules(openTaxis, stop.sequenceIndex);
                     }
                 }
 
                 if (chosenTaxi) {
                     unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
                 } else {
-                    // Split / Spillover distribution loop block
+                    // Split spillover loop handling 8-stop enforcement limitations
                     while (unassignedRiders.length > 0) {
-                        let currentOpenTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
+                        let currentOpenTaxis = finalizedTaxis.filter(t => {
+                            let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
+                            currentStopsSet.add(stop.stopName);
+                            return (TAXI_CAPACITY - t.passengers.length) > 0 && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
+                        });
+
                         let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
                         
                         if (fitTaxi) {
                             let chunk = unassignedRiders.splice(0, unassignedRiders.length);
                             chunk.forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
+                        } else if (currentOpenTaxis.length > 0) {
+                            let partialTaxi = currentOpenTaxis[0];
+                            let seatsAvailable = TAXI_CAPACITY - partialTaxi.passengers.length;
+                            let chunk = unassignedRiders.splice(0, seatsAvailable);
+                            chunk.forEach(p => { p.assigned = true; partialTaxi.passengers.push(p); });
                         } else {
                             let newTaxi = { passengers: [] };
                             finalizedTaxis.push(newTaxi);
-                            let seatsAvailable = TAXI_CAPACITY;
-                            let chunk = unassignedRiders.splice(0, seatsAvailable);
+                            let seatsToTake = Math.min(TAXI_CAPACITY, unassignedRiders.length);
+                            let chunk = unassignedRiders.splice(0, seatsToTake);
                             chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
                         }
                     }
                 }
             });
 
-            // PHASE 3: EVALUATE MANIFEST SEAT COUNT AGAINST CAPACITY CUTOFF MINIMUMS
+            // PHASE 3: TRIM MANIFESTS FALLING SHORT OF THE EFFICIENCY LIMIT (14 SEATS)
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -554,7 +573,7 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 4: RE-RENDER GRAPHIC CONSOLE ROSTERS
+            // PHASE 4: UI MANIFEST INTERFACE GENERATOR
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -564,6 +583,7 @@
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
+                let uniqueStopsInTaxiCount = new Set(taxi.passengers.map(p => p.displayStop)).size;
                 let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
@@ -604,7 +624,12 @@
 
                 vehicleBlockElement.innerHTML = `
                     <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
-                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
+                        <div class="vehicle-title">
+                            🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} 
+                            <span style="font-weight:normal; font-size:0.95rem; color:#475569;">
+                                (${taxi.passengers.length}/${TAXI_CAPACITY} seats • 📌 ${uniqueStopsInTaxiCount}/${MAX_UNIQUE_STOPS_LIMIT} stops)
+                            </span>
+                        </div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
                     </div>
                     <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
@@ -622,7 +647,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: RUN UNASSIGNED LIMBO OUTPUT MODULE
+            // PHASE 5: RUN UNASSIGNED LIMBO OUTPUT CARD
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -649,7 +674,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers).</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers) or cannot fit existing taxis without violating the maximum 8 stops constraint limit.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
