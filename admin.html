@@ -230,6 +230,7 @@
         
         <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
         <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
+        <button class="refresh-btn" style="background: var(--error);" onclick="triggerClearAllGate()">🗑️ Clear All Sign-Ups</button>
         
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
@@ -751,6 +752,37 @@
             pendingDeletionId = null; pendingDeletionName = null;
         } else {
             document.getElementById('modalErrorMessageBox').style.display = "block";
+        }
+    }
+
+    // INSTANT MASTER WIPE ENGINE FOR MANUAL CYCLE CLEARS
+    async function triggerClearAllGate() {
+        const accessPasswordInput = prompt("⚠️ WARNING: You are about to completely wipe the entire signup roster from the live cloud database.\n\nPlease enter the administrative password to confirm action:");
+        if (accessPasswordInput === null) return; 
+
+        if (accessPasswordInput === ADMIN_PASSWORD) {
+            const finalWarningConfirmation = confirm("Are you absolutely sure? This will remove all names and reset the dashboard rosters instantly.");
+            if (!finalWarningConfirmation) return;
+
+            const diagnosticBoxHeader = document.getElementById('diagnosticStatus');
+            try {
+                diagnosticBoxHeader.className = "status-good";
+                diagnosticBoxHeader.innerHTML = "⏳ Communicating wipe request with cloud servers...";
+
+                // Universally target all existing rows safely without encountering type cast compilation issues
+                const { error } = await churchDb.from('church_signups').delete().not('id', 'is', null);
+                
+                if (error) {
+                    alert("Database Wipe Exception: " + error.message);
+                } else {
+                    alert("🗑️ Live roster wiped successfully. System reset accomplished.");
+                    fetchAndCompileLogistics();
+                }
+            } catch (networkException) {
+                alert("Network communication dropped: " + networkException.message);
+            }
+        } else {
+            alert("❌ Incorrect Password. Database wipe aborted.");
         }
     }
 
