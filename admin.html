@@ -262,7 +262,7 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // FLUID 27-STEP SYSTEM PATTERN TO RETAIN GRANULAR OPTIMAL COMBINATIONS
+    // MASTER CHRONOLOGICAL SEQUENCE LINE
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
@@ -336,20 +336,54 @@
         }
     }
 
-    // Mathematical subset solver scanning for unbroken whole-stop combinations that add up exactly to 17
-    function findPerfectSubset(stopGroups, targetCapacity) {
-        for (let i = 1; i < (1 << stopGroups.length); i++) {
-            let sum = 0;
-            let subset = [];
-            for (let j = 0; j < stopGroups.length; j++) {
-                if (i & (1 << j)) {
-                    sum += stopGroups[j].passengers.length;
-                    subset.push(stopGroups[j]);
+    // COHESION INDEX SUBSET OPTIMIZATION SOLVER
+    function findOptimalCohesiveSubset(stopGroups) {
+        let bestSubset = null;
+        let bestScore = { uniqueAreas: Infinity, uniqueStops: Infinity, geographicSpan: Infinity };
+
+        function backtrack(index, currentSubset, currentSum) {
+            if (currentSum === TAXI_CAPACITY) {
+                let uniqueAreas = new Set(currentSubset.map(g => g.sourceArea)).size;
+                let uniqueStops = currentSubset.length;
+                
+                let indices = currentSubset.map(g => MASTER_ROUTE_SEQUENCE.indexOf(g.stopName));
+                let geographicSpan = Math.max(...indices) - Math.min(...indices);
+
+                let isBetter = false;
+                if (uniqueAreas < bestScore.uniqueAreas) {
+                    isBetter = true;
+                } else if (uniqueAreas === bestScore.uniqueAreas) {
+                    if (uniqueStops < bestScore.uniqueStops) {
+                        isBetter = true;
+                    } else if (uniqueStops === bestScore.uniqueStops) {
+                        if (geographicSpan < bestScore.geographicSpan) {
+                            isBetter = true;
+                        }
+                    }
                 }
+
+                if (isBetter) {
+                    bestSubset = [...currentSubset];
+                    bestScore = { uniqueAreas, uniqueStops, geographicSpan };
+                }
+                return;
             }
-            if (sum === targetCapacity) return subset;
+            if (currentSum > TAXI_CAPACITY || index >= stopGroups.length) return;
+
+            // Option A: Include entire stop group
+            let groupCount = stopGroups[index].passengers.length;
+            if (currentSum + groupCount <= TAXI_CAPACITY) {
+                currentSubset.push(stopGroups[index]);
+                backtrack(index + 1, currentSubset, currentSum + groupCount);
+                currentSubset.pop();
+            }
+
+            // Option B: Exclude entire stop group
+            backtrack(index + 1, currentSubset, currentSum);
         }
-        return null;
+
+        backtrack(0, [], 0);
+        return bestSubset;
     }
 
     async function fetchAndCompileLogistics() {
@@ -365,7 +399,7 @@
                 return;
             }
 
-            // PASS 0: AUTOMATIC REAL-TIME DE-DUPLICATION PIPELINE
+            // PASS 0: REAL-TIME DE-DUPLICATION PIPELINE
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -389,7 +423,7 @@
                 return;
             }
 
-            // CLEANING AND MATCH OVERRIDE LOGIC PIPELINE
+            // NORMALIZATION PIPELINE WITH GRACEFUL TYPO HANDLING
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
@@ -397,6 +431,9 @@
                 if (dbStopRaw.toLowerCase() === "education" || dbStopRaw.toLowerCase() === "education campus") dbStopRaw = "Education Campus";
                 if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
                 if (dbStopRaw.toLowerCase() === "uj bunting") dbStopRaw = "UJ Bunting";
+                if (dbStopRaw.toLowerCase() === "urban circle" || dbStopRaw.toLowerCase() === "urban curcle") dbStopRaw = "Urban Circle";
+                if (dbStopRaw.toLowerCase() === "56 jorisen" || dbStopRaw.toLowerCase() === "56 jorissen") dbStopRaw = "56 Jorissen";
+                if (dbStopRaw.toLowerCase() === "stanley avenue" || dbStopRaw.toLowerCase() === "stanley") dbStopRaw = "Stanley Avenue";
 
                 let displayStop = "Unknown";
                 let mappedArea = "Unknown Route";
@@ -413,7 +450,7 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: EXTRACT WHOLE CHECKPOINTS EXCEEDING CAPACITY LIMITS (>=17)
+            // PASS 1: INDIVIDUAL STOP CHUNKING (Extract full vehicles of 17 immediately)
             MASTER_ROUTE_SEQUENCE.forEach(sName => {
                 let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                 while (matchingRiders.length >= TAXI_CAPACITY) {
@@ -423,70 +460,52 @@
                 }
             });
 
-            // PASS 2: COMBINATORIAL SUBSET SEARCH ENGINE (Locates combinations that make exactly 17)
-            let perfectMatchFound = true;
-            while (perfectMatchFound) {
-                let activeStops = [];
+            // PASS 2: COHESIVE SUBSET COMBINATIONS ENGINE (Finds optimal matches for exact 17 capacities)
+            let processingActive = true;
+            while (processingActive) {
+                let activeStopGroups = [];
                 MASTER_ROUTE_SEQUENCE.forEach(sName => {
                     let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
                     if (unassignedRiders.length > 0) {
-                        activeStops.push({ stopName: sName, passengers: unassignedRiders });
+                        activeStopGroups.push({ 
+                            stopName: sName, 
+                            passengers: unassignedRiders, 
+                            sourceArea: AREA_MAPPING[sName] || "Unknown Route" 
+                        });
                     }
                 });
 
-                let targetSubset = findPerfectSubset(activeStops, TAXI_CAPACITY);
-                if (targetSubset) {
+                let optimalSubset = findOptimalCohesiveSubset(activeStopGroups);
+                if (optimalSubset) {
                     let taxiContent = [];
-                    targetSubset.forEach(group => {
+                    optimalSubset.forEach(group => {
                         group.passengers.forEach(p => { p.assigned = true; taxiContent.push(p); });
                     });
                     finalizedTaxis.push({ passengers: taxiContent });
                 } else {
-                    perfectMatchFound = false;
+                    processingActive = false;
                 }
             }
 
-            // PASS 3: STANDALONE INTRA-AREA POOLING COHESION FALLBACK (Keeps remaining area passengers together)
-            let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
-            uniqueAreas.forEach(areaName => {
-                let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
-                if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
-                    remainingAreaRiders.forEach(p => p.assigned = true);
-                    finalizedTaxis.push({ passengers: remainingAreaRiders });
-                }
+            // PASS 3: CHRONOLOGICAL SEQUENTIAL PACKING FOR REMAINING RESIDUAL POOLS
+            let residualPassengers = workingPool.filter(p => !p.assigned);
+            residualPassengers.sort((a, b) => {
+                return MASTER_ROUTE_SEQUENCE.indexOf(a.displayStop) - MASTER_ROUTE_SEQUENCE.indexOf(b.displayStop);
             });
 
-            // PASS 4: CHRONOLOGICAL GREEDY PACKER FOR REMAINING LEFTOVERS BELOW MIN FLOORS
-            let leftoversPool = [];
-            MASTER_ROUTE_SEQUENCE.forEach(sName => {
-                let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-                if (unassignedRiders.length > 0) {
-                    leftoversPool.push({ stopName: sName, passengers: unassignedRiders });
-                }
-            });
-
-            while (leftoversPool.length > 0) {
-                let currentGroup = leftoversPool.shift();
-                let targetStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(currentGroup.stopName);
-                
+            while (residualPassengers.length > 0) {
                 let openTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY);
-                
                 if (!openTaxi) {
                     openTaxi = { passengers: [] };
                     finalizedTaxis.push(openTaxi);
                 }
-
-                let seatsLeft = TAXI_CAPACITY - openTaxi.passengers.length;
-                let allocation = currentGroup.passengers.splice(0, seatsLeft);
-                allocation.forEach(p => p.assigned = true);
-                openTaxi.passengers.push(...allocation);
-
-                if (currentGroup.passengers.length > 0) {
-                    leftoversPool.unshift(currentGroup);
-                }
+                let spaceLeft = TAXI_CAPACITY - openTaxi.passengers.length;
+                let allocationBatch = residualPassengers.splice(0, spaceLeft);
+                allocationBatch.forEach(p => p.assigned = true);
+                openTaxi.passengers.push(...allocationBatch);
             }
 
-            // PASS 5: VALIDATE AND TRIM REMAINING TAXIS AGAINST SEAT MINIMUM BOUNDS
+            // PASS 4: DISMISS EMPTY OR UNDER-UTILIZED TAXIS BELOW THE REQUIRED MIN FLOOR BOUNDS
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -496,11 +515,12 @@
                 }
             });
 
+            // Re-sync final assignment markers
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 5: INTERFACE ACCORDION MANIFEST RENDERER
+            // PHASE 5: INTERFACE ACCORDION DISPLAY MANIFEST GENERATION ENGINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -521,7 +541,7 @@
                 
                 let routePlanStrings = [];
                 MASTER_ROUTE_SEQUENCE.forEach(sName => {
-                    if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
+                    if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
                 });
 
                 let tableRowsHtml = '';
@@ -568,7 +588,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 6: UNASSIGNED LIMBO BOX DESIGN RENDERING
+            // PHASE 6: UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
