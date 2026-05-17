@@ -24,7 +24,6 @@
             --warning-bg: #fffbeb;
             --warning-text: #92400e;
             --warning-border: #fcd34d;
-            --bus-theme: #7c3aed;
         }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -52,30 +51,6 @@
         }
         .status-good { color: var(--success); font-weight: bold; }
         .status-bad { color: var(--error); font-weight: bold; background: #fee2e2; padding: 10px; border-radius: 6px; }
-        
-        .tabs-nav {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 10px;
-        }
-        .tab-btn {
-            background: #e2e8f0;
-            color: #475569;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            font-size: 0.95rem;
-            transition: all 0.2s;
-        }
-        .tab-btn.active { background: var(--primary); color: white; }
-        .tab-btn.active.pm-tab { background: var(--bus-theme); }
-        .tab-panel { display: none; }
-        .tab-panel.active { display: block; }
-
         .date-badge {
             display: inline-block;
             background-color: #eff6ff;
@@ -87,6 +62,7 @@
             margin-bottom: 15px;
         }
         
+        /* VEHICLE MANIFEST ACCORDION STYLES */
         .vehicle-block {
             background: var(--card);
             border: 1px solid #cbd5e1;
@@ -106,7 +82,6 @@
             transition: background 0.2s;
             border-left: 6px solid var(--success);
         }
-        .vehicle-header-trigger.bus-header { border-left-color: var(--bus-theme); }
         .vehicle-header-trigger:hover { background: #f1f5f9; }
         .vehicle-title {
             color: #065f46;
@@ -116,7 +91,6 @@
             align-items: center;
             gap: 10px;
         }
-        .vehicle-title.bus-title { color: #5b21b6; }
         .toggle-status-badge {
             font-size: 0.85rem;
             background: #e2e8f0;
@@ -125,8 +99,14 @@
             border-radius: 6px;
             font-weight: bold;
         }
-        .vehicle-collapsible-content { display: none; padding: 20px; border-top: 1px solid #cbd5e1; background: var(--card); }
+        .vehicle-collapsible-content {
+            display: none; 
+            padding: 20px;
+            border-top: 1px solid #cbd5e1;
+            background: var(--card);
+        }
         
+        /* UNROSTERED PASSENGER BOX STYLES */
         .limbo-block {
             background: var(--limbo-bg);
             border: 1px solid var(--limbo-border);
@@ -147,64 +127,120 @@
             border-left: 6px solid var(--error);
         }
         .limbo-header-trigger:hover { background: #fecdd3; }
-        .limbo-title { color: var(--limbo-text); font-weight: bold; font-size: 1.15rem; }
-        .limbo-collapsible-content { display: none; padding: 20px; border-top: 1px solid var(--limbo-border); background: #fff1f2; }
+        .limbo-title {
+            color: var(--limbo-text);
+            font-weight: bold;
+            font-size: 1.15rem;
+        }
+        .limbo-collapsible-content {
+            display: none; 
+            padding: 20px;
+            border-top: 1px solid var(--limbo-border);
+            background: #fff1f2;
+        }
 
-        .stop-summary-inline { background: #f1f5f9; padding: 12px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 15px; color: #475569; line-height: 1.4; }
-        .cross-rider-tag { background: #fef3c7; color: var(--warning-text); border: 1px solid var(--warning-border); font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; }
-        .hub-consolidation-tag { background: #ede9fe; color: #6d28d9; border: 1px solid #c084fc; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; }
+        .stop-summary-inline {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            color: #475569;
+            line-height: 1.4;
+        }
+        .cross-rider-tag {
+            background: #fef3c7;
+            color: var(--warning-text);
+            border: 1px solid var(--warning-border);
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; color: #334155; }
         th { background: #f8fafc; color: #475569; font-weight: 600; }
-        .delete-btn { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .refresh-btn { background: var(--success); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; }
+        .delete-btn {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+        }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 99999; box-sizing: border-box; }
-        .modal-card { background: white; max-width: 440px; margin: 15% auto; padding: 28px; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; }
-        .modal-input { width: 100%; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: 1rem; margin-top: 10px; margin-bottom: 8px; box-sizing: border-box; }
+        /* SECURITY VERIFICATION DIALOGS */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            box-sizing: border-box;
+        }
+        .modal-card {
+            background: white;
+            max-width: 440px;
+            margin: 15% auto;
+            padding: 28px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-top: 10px;
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
 
+    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
+    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
-        <h2>🚖 Transport Management Dashboard</h2>
+        <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
+        <p style="margin-bottom: 20px;">Total Unique Sign-Ups: <strong id="totalCount" style="color:var(--primary); font-size:1.2rem;">0</strong></p>
         
-        <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
-            <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
-            <button class="refresh-btn" style="background: var(--error);" onclick="triggerClearAllGate()">🗑️ Clear All Sign-Ups</button>
-        </div>
-
-        <div class="tabs-nav">
-            <button class="tab-btn active" onclick="switchServiceTab('am')">🌅 AM Service (Volunteers / Taxis)</button>
-            <button class="tab-btn pm-tab" onclick="switchServiceTab('pm')">🌆 PM Service (Sermon / Busses & Taxis)</button>
-        </div>
+        <button class="refresh-btn" onclick="fetchAndCompileLogistics()">🔄 Refresh Live Data From Cloud</button>
+        <button class="refresh-btn" style="background: #475569;" onclick="downloadExcelBackup()">📊 Download Excel Report</button>
+        <button class="refresh-btn" style="background: var(--error);" onclick="triggerClearAllGate()">🗑️ Clear All Sign-Ups</button>
         
-        <div id="amTabPanel" class="tab-panel active">
-            <h3>🌅 Active Morning Commute Taxis</h3>
-            <p>Total Morning Registrations: <strong id="amTotalCount" style="color:var(--primary);">0</strong></p>
-            <div id="amManifestContainer"></div>
-        </div>
-
-        <div id="pmTabPanel" class="tab-panel">
-            <h3>🌆 Active Evening Commute Busses & Taxis</h3>
-            <p>Total Evening Registrations: <strong id="pmTotalCount" style="color:var(--bus-theme);">0</strong></p>
-            <div id="pmManifestContainer"></div>
-        </div>
+        <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
+    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
 </div>
 
+<!-- SECURITY MODAL DIALOG CONTAINER PORTAL -->
 <div id="customSecurityModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:#0f172a;">🔒 Security Verification</h3>
@@ -224,15 +260,11 @@
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const ADMIN_PASSWORD = "Church2026"; 
-    
     const TAXI_CAPACITY = 17;
-    const TAXI_MIN_FLOOR = 14;
-    const TAXI_MAX_STOPS = 8;
-    
-    const BUS_CAPACITY = 60;
-    const BUS_MIN_TRIGGER = 40; // 40-PERSON MINIMUM BUS TRIGGER RULE
-    const BUS_MAX_STOPS = 5;
+    const MIN_PASSENGER_FLOOR = 14;
+    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER RULE
 
+    // UPDATED ROUTE SELECTION MAPPED TO CHECKPOINTS
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -249,7 +281,6 @@
     let churchDb = null;
     let pendingDeletionId = null;
     let pendingDeletionName = null;
-    let currentActiveServiceTab = 'am';
 
     function initializeAdmin() {
         try {
@@ -262,21 +293,6 @@
         }
     }
 
-    function switchServiceTab(serviceType) {
-        currentActiveServiceTab = serviceType;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-        
-        if(serviceType === 'am') {
-            document.querySelector('.tab-btn[onclick*="am"]').classList.add('active');
-            document.getElementById('amTabPanel').classList.add('active');
-        } else {
-            document.querySelector('.tab-btn[onclick*="pm"]').classList.add('active');
-            document.getElementById('pmTabPanel').classList.add('active');
-        }
-        fetchAndCompileLogistics();
-    }
-
     function calculateUpcomingSunday() {
         let today = new Date();
         let dayOfWeek = today.getDay(); 
@@ -284,7 +300,9 @@
         let targetSunday = new Date(today);
         targetSunday.setDate(today.getDate() + daysUntilSunday);
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        document.querySelectorAll('.targetSundayDate').forEach(el => { el.innerText = targetSunday.toLocaleDateString('en-ZA', options); });
+        document.querySelectorAll('.targetSundayDate').forEach(el => {
+            el.innerText = targetSunday.toLocaleDateString('en-ZA', options);
+        });
     }
 
     function toggleTaxiView(globalId) {
@@ -293,9 +311,13 @@
         if (targetContentBlock.style.display === "block") {
             targetContentBlock.style.display = "none";
             targetBadge.innerText = "▼ Show List";
+            targetBadge.style.background = "#e2e8f0";
+            targetBadge.style.color = "#475569";
         } else {
             targetContentBlock.style.display = "block";
             targetBadge.innerText = "▲ Hide List";
+            targetBadge.style.background = "#dcfce7";
+            targetBadge.style.color = "#15803d";
         }
     }
 
@@ -305,12 +327,17 @@
         if (targetContentBlock.style.display === "block") {
             targetContentBlock.style.display = "none";
             targetBadge.innerText = "▼ Show List";
+            targetBadge.style.background = "#e2e8f0";
+            targetBadge.style.color = "#475569";
         } else {
             targetContentBlock.style.display = "block";
             targetBadge.innerText = "▲ Hide List";
+            targetBadge.style.background = "#ffe4e6";
+            targetBadge.style.color = "#9f1239";
         }
     }
 
+    // CONDITIONAL ROUTE MATRIX PLANNER
     function getCustomRouteSequence(taxiStopsList) {
         let sequence = [...MASTER_ROUTE_SEQUENCE];
         if (taxiStopsList.includes("Charlotte Maxeke") && taxiStopsList.includes("Education Campus") && taxiStopsList.includes("Arteria")) {
@@ -324,7 +351,8 @@
         return sequence;
     }
 
-    function findPerfectSubset(stops, targetCapacity, maxStopsLimit) {
+    // Combinatorial subset optimization engine
+    function findPerfectSubset(stops, targetCapacity) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
             let subset = [];
@@ -336,20 +364,28 @@
                     uniqueStopsSet.add(stops[j].stopName);
                 }
             }
-            if (sum === targetCapacity && uniqueStopsSet.size <= maxStopsLimit) {
+            if (sum === targetCapacity && uniqueStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT) {
                 return subset;
             }
         }
         return null;
     }
 
+    // Tie-breaker algorithm filtering by complexity matrix and proximity indexes
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
-        let minStopsCount = Math.min(...taxisList.map(t => new Set(t.passengers.map(p => p.displayStop)).size));
-        let lowestStopsTaxis = taxisList.filter(t => new Set(t.passengers.map(p => p.displayStop)).size === minStopsCount);
+        let minStopsCount = Math.min(...taxisList.map(t => {
+            return new Set(t.passengers.map(p => p.displayStop)).size;
+        }));
+        
+        let lowestStopsTaxis = taxisList.filter(t => {
+            return new Set(t.passengers.map(p => p.displayStop)).size === minStopsCount;
+        });
+
         if (lowestStopsTaxis.length === 1) return lowestStopsTaxis[0];
 
         let bestTaxiInstance = null;
         let minimumPathDistance = Infinity;
+
         lowestStopsTaxis.forEach(t => {
             t.passengers.forEach(p => {
                 let existingStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop);
@@ -360,6 +396,7 @@
                 }
             });
         });
+
         return bestTaxiInstance || lowestStopsTaxis[0];
     }
 
@@ -386,23 +423,21 @@
                 }
             });
 
-            let amRecords = deduplicatedRecords.filter(r => !r.service_time || r.service_time.toLowerCase() === 'am');
-            let pmRecords = deduplicatedRecords.filter(r => r.service_time && r.service_time.toLowerCase() === 'pm');
+            document.getElementById('totalCount').innerText = deduplicatedRecords.length;
 
-            document.getElementById('amTotalCount').innerText = amRecords.length;
-            document.getElementById('pmTotalCount').innerText = pmRecords.length;
-
-            const amContainer = document.getElementById('amManifestContainer');
-            const pmContainer = document.getElementById('pmManifestContainer');
+            const manifestContainer = document.getElementById('manifestContainer');
             const limboSectionContainer = document.getElementById('limboSectionContainer');
-            
-            amContainer.innerHTML = '';
-            pmContainer.innerHTML = '';
+            manifestContainer.innerHTML = '';
             limboSectionContainer.innerHTML = '';
 
-            let targetActiveRidersPool = currentActiveServiceTab === 'am' ? amRecords : pmRecords;
+            if(deduplicatedRecords.length === 0) {
+                statusHeader.innerHTML = "🟢 Sync Verified. Real-time database is currently empty.";
+                manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
+                return;
+            }
 
-            let workingPool = targetActiveRidersPool.map(r => {
+            // TRANSLATION LAYER STRUCTURING SPECIFIC PICKUP LABELS TO CENTRAL HUB SEQUENCES
+            let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
                 if (["56 jorissen", "amani", "apex", "student digzz", "ymca", "braam"].includes(dbStopRaw)) {
@@ -431,215 +466,165 @@
                         break;
                     }
                 }
-                return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop, initialStop: displayStop };
+                return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
-            let finalizedVehicles = [];
+            let finalizedTaxis = [];
 
-            if (currentActiveServiceTab === 'am') {
-                /****************************************************************
-                 * AM COMPILATION STANDARD TRACK: TAXI ENGINE RUN ONLY
-                 ****************************************************************/
-                let stopMap = {};
-                workingPool.forEach(p => {
-                    if (!stopMap[p.displayStop]) {
-                        stopMap[p.displayStop] = { stopName: p.displayStop, sourceArea: p.sourceArea, passengers: [], sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop) };
-                    }
-                    stopMap[p.displayStop].passengers.push(p);
-                });
-                let allStopsList = Object.values(stopMap);
-
-                let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
-                uniqueAreas.forEach(areaName => {
-                    let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
-                    let processingArea = true;
-                    while (processingArea) {
-                        let unallocatedAreaStops = areaStops.filter(s => s.passengers.every(p => !p.assigned));
-                        let perfectSubset = findPerfectSubset(unallocatedAreaStops, TAXI_CAPACITY, TAXI_MAX_STOPS);
-                        if (perfectSubset) {
-                            let taxiPassengers = [];
-                            perfectSubset.forEach(stop => stop.passengers.forEach(p => { p.assigned = true; taxiPassengers.push(p); }));
-                            finalizedVehicles.push({ type: 'taxi', capacity: TAXI_CAPACITY, maxStops: TAXI_MAX_STOPS, passengers: taxiPassengers });
-                        } else {
-                            processingArea = false;
-                        }
-                    }
-                });
-
-                let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
-                remainingStops.sort((a, b) => a.sourceArea !== b.sourceArea ? uniqueAreas.indexOf(a.sourceArea) - uniqueAreas.indexOf(b.sourceArea) : a.sequenceIndex - b.sequenceIndex);
-
-                remainingStops.forEach(stop => {
-                    let unassignedRiders = stop.passengers.filter(p => !p.assigned);
-                    if (unassignedRiders.length === 0) return;
-
-                    let P = unassignedRiders.length;
-                    let openTaxis = finalizedVehicles.filter(t => {
-                        let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
-                        currentStopsSet.add(stop.stopName);
-                        return (TAXI_CAPACITY - t.passengers.length) >= P && currentStopsSet.size <= TAXI_MAX_STOPS;
-                    });
-
-                    let chosenTaxi = null;
-                    if (openTaxis.length > 0) {
-                        let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
-                        chosenTaxi = perfectFitTaxis.length > 0 ? selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex) : selectBestTaxiByRules(openTaxis, stop.sequenceIndex);
-                    }
-
-                    if (chosenTaxi) {
-                        unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
-                    } else {
-                        while (unassignedRiders.length > 0) {
-                            let currentOpenTaxis = finalizedVehicles.filter(t => {
-                                let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
-                                currentStopsSet.add(stop.stopName);
-                                return (TAXI_CAPACITY - t.passengers.length) > 0 && currentStopsSet.size <= TAXI_MAX_STOPS;
-                            });
-
-                            let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
-                            if (fitTaxi) {
-                                unassignedRiders.splice(0, unassignedRiders.length).forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
-                            } else if (currentOpenTaxis.length > 0) {
-                                let partialTaxi = currentOpenTaxis[0];
-                                let seatsAvailable = TAXI_CAPACITY - partialTaxi.passengers.length;
-                                unassignedRiders.splice(0, seatsAvailable).forEach(p => { p.assigned = true; partialTaxi.passengers.push(p); });
-                            } else {
-                                let newTaxi = { type: 'taxi', capacity: TAXI_CAPACITY, maxStops: TAXI_MAX_STOPS, passengers: [] };
-                                finalizedVehicles.push(newTaxi);
-                                unassignedRiders.splice(0, Math.min(TAXI_CAPACITY, unassignedRiders.length)).forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
-                            }
-                        }
-                    }
-                });
-
-                finalizedVehicles = finalizedVehicles.filter(v => {
-                    if (v.passengers.length >= TAXI_MIN_FLOOR) return true;
-                    v.passengers.forEach(p => p.assigned = false); return false;
-                });
-
-            } else {
-                /****************************************************************
-                 * PM COMPILATION MASS-TRANSIT TRACK: BUS (MIN 40) + TAXI FALLBACK
-                 ****************************************************************/
-                let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
-                
-                // PASS 1: AREA-LEVEL AGGREGATION & BUS IDENTIFICATION
-                let areaRosterPools = {};
-                uniqueAreas.forEach(areaName => {
-                    areaRosterPools[areaName] = workingPool.filter(p => p.sourceArea === areaName);
-                });
-
-                // CROSS-OVER POOLING MATCHMAKER LEG
-                // If an area has some riders but is below 40, check if borrowing neighbors pushes it above 40
-                uniqueAreas.forEach((areaName, idx) => {
-                    let currentAreaPool = areaRosterPools[areaName].filter(p => !p.assigned);
-                    if (currentAreaPool.length > 0 && currentAreaPool.length < BUS_MIN_TRIGGER) {
-                        // Look at the adjacent neighbor in the sequence list to help merge numbers
-                        let neighborIdx = idx === uniqueAreas.length - 1 ? idx - 1 : idx + 1;
-                        let neighborAreaName = uniqueAreas[neighborIdx];
-                        let neighborPool = areaRosterPools[neighborAreaName].filter(p => !p.assigned);
-
-                        if (currentAreaPool.length + neighborPool.length >= BUS_MIN_TRIGGER) {
-                            // Pull riders from neighbor to help construct a pooled cross-area bus
-                            let availableSeats = BUS_CAPACITY - currentAreaPool.length;
-                            let borrowedRiders = neighborPool.splice(0, availableSeats);
-                            currentAreaPool.push(...borrowedRiders);
-                        }
-                    }
-
-                    // CRITICAL ALLOCATION FOR QUALIFYING PM BUSSES (Total riders >= 40)
-                    if (currentAreaPool.length >= BUS_MIN_TRIGGER) {
-                        let activeUniqueStops = Array.from(new Set(currentAreaPool.map(p => p.displayStop)));
-                        
-                        // Collapse stops down into high volume hubs if they exceed the 5-stop restriction
-                        if (activeUniqueStops.length > BUS_MAX_STOPS) {
-                            activeUniqueStops.sort((a, b) => {
-                                return currentAreaPool.filter(p => p.displayStop === a).length - currentAreaPool.filter(p => p.displayStop === b).length;
-                            });
-
-                            while (activeUniqueStops.length > BUS_MAX_STOPS) {
-                                let lowestVolumeStop = activeUniqueStops.shift();
-                                let lowestIdx = MASTER_ROUTE_SEQUENCE.indexOf(lowestVolumeStop);
-                                
-                                let nearestHubName = null;
-                                let minDistance = Infinity;
-                                activeUniqueStops.forEach(hubName => {
-                                    let dist = Math.abs(MASTER_ROUTE_SEQUENCE.indexOf(hubName) - lowestIdx);
-                                    if (dist < minDistance) { minDistance = dist; nearestHubName = hubName; }
-                                });
-
-                                currentAreaPool.forEach(p => {
-                                    if (p.displayStop === lowestVolumeStop) { p.displayStop = nearestHubName; p.isConsolidated = true; }
-                                });
-                            }
-                        }
-
-                        // Dispatch 60-seat bus structures
-                        while (currentAreaPool.length > 0) {
-                            let busInstance = { type: 'bus', capacity: BUS_CAPACITY, maxStops: BUS_MAX_STOPS, passengers: [] };
-                            finalizedVehicles.push(busInstance);
-                            let chunk = currentAreaPool.splice(0, BUS_CAPACITY);
-                            chunk.forEach(p => { p.assigned = true; busInstance.passengers.push(p); });
-                        }
-                    }
-                });
-
-                // PASS 2: LEFTOVER LOW-TRAFFIC STANDALONE TAXI ALLOCATION RUN
-                let pmLeftoverRiders = workingPool.filter(p => !p.assigned);
-                if (pmLeftoverRiders.length > 0) {
-                    let taxiInstance = { type: 'taxi', capacity: TAXI_CAPACITY, maxStops: TAXI_MAX_STOPS, passengers: [] };
-                    finalizedVehicles.push(taxiInstance);
-                    pmLeftoverRiders.forEach(p => { p.assigned = true; taxiInstance.passengers.push(p); });
+            let stopMap = {};
+            workingPool.forEach(p => {
+                if (!stopMap[p.displayStop]) {
+                    stopMap[p.displayStop] = {
+                        stopName: p.displayStop,
+                        sourceArea: p.sourceArea,
+                        passengers: [],
+                        sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop)
+                    };
                 }
-            }
+                stopMap[p.displayStop].passengers.push(p);
+            });
+            let allStopsList = Object.values(stopMap);
 
-            finalizedVehicles.forEach(v => v.passengers.forEach(p => p.assigned = true));
+            // PHASE 1: EXECUTE WHOLE REGIONAL MATCH COMBINATIONS
+            let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
+            uniqueAreas.forEach(areaName => {
+                let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
+                let processingArea = true;
+                while (processingArea) {
+                    let unallocatedAreaStops = areaStops.filter(s => s.passengers.every(p => !p.assigned));
+                    let perfectSubset = findPerfectSubset(unallocatedAreaStops, TAXI_CAPACITY);
+                    if (perfectSubset) {
+                        let taxiPassengers = [];
+                        perfectSubset.forEach(stop => {
+                            stop.passengers.forEach(p => { p.assigned = true; taxiPassengers.push(p); });
+                        });
+                        finalizedTaxis.push({ passengers: taxiPassengers });
+                    } else {
+                        processingArea = false;
+                    }
+                }
+            });
+
+            // PHASE 2: PACK REMAINING SPILLOVERS FULFILLING CAPACITY AND THE 8-STOP BOUNDS
+            let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
+            remainingStops.sort((a, b) => {
+                if (a.sourceArea !== b.sourceArea) {
+                    return uniqueAreas.indexOf(a.sourceArea) - uniqueAreas.indexOf(b.sourceArea);
+                }
+                return a.sequenceIndex - b.sequenceIndex;
+            });
+
+            remainingStops.forEach(stop => {
+                let unassignedRiders = stop.passengers.filter(p => !p.assigned);
+                if (unassignedRiders.length === 0) return;
+
+                let P = unassignedRiders.length;
+                
+                let openTaxis = finalizedTaxis.filter(t => {
+                    let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
+                    currentStopsSet.add(stop.stopName);
+                    return (TAXI_CAPACITY - t.passengers.length) >= P && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
+                });
+
+                let chosenTaxi = null;
+                if (openTaxis.length > 0) {
+                    let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
+                    if (perfectFitTaxis.length > 0) {
+                        chosenTaxi = selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex);
+                    } else {
+                        chosenTaxi = selectBestTaxiByRules(openTaxis, stop.sequenceIndex);
+                    }
+                }
+
+                if (chosenTaxi) {
+                    unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
+                } else {
+                    // TYPE-SAFE FALLBACK DISPATCH ENGINE
+                    while (unassignedRiders.length > 0) {
+                        let currentOpenTaxis = finalizedTaxis.filter(t => {
+                            let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
+                            currentStopsSet.add(stop.stopName);
+                            return (TAXI_CAPACITY - t.passengers.length) > 0 && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
+                        });
+
+                        let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
+                        
+                        if (fitTaxi) {
+                            let chunk = unassignedRiders.splice(0, unassignedRiders.length);
+                            chunk.forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
+                        } else if (currentOpenTaxis.length > 0) {
+                            let partialTaxi = currentOpenTaxis[0];
+                            let seatsAvailable = TAXI_CAPACITY - partialTaxi.passengers.length;
+                            let chunk = unassignedRiders.splice(0, seatsAvailable);
+                            chunk.forEach(p => { p.assigned = true; partialTaxi.passengers.push(p); });
+                        } else {
+                            let newTaxi = { passengers: [] };
+                            finalizedTaxis.push(newTaxi);
+                            let seatsToTake = Math.min(TAXI_CAPACITY, unassignedRiders.length);
+                            let chunk = unassignedRiders.splice(0, seatsToTake);
+                            chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
+                        }
+                    }
+                }
+            });
+
+            // PHASE 3: REMOVE MANIFESTS SHORT OF CAPACITIES (14 SEATS)
+            finalizedTaxis = finalizedTaxis.filter(taxi => {
+                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    return true;
+                } else {
+                    taxi.passengers.forEach(p => p.assigned = false);
+                    return false;
+                }
+            });
+
+            finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
-            let globalVehicleCounter = 1;
+            let globalTaxiCounter = 1;
 
-            let targetOutputPane = currentActiveServiceTab === 'am' ? amContainer : pmContainer;
-
-            finalizedVehicles.forEach(vehicle => {
-                let runningGlobalId = globalVehicleCounter++;
+            // PHASE 4: UI GENERATION PIPELINE
+            finalizedTaxis.forEach(taxi => {
+                let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
                 vehicleBlockElement.className = 'vehicle-block';
 
                 let areaTallyMap = {};
-                vehicle.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
+                taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
-                let uniqueStopsInVehicleSet = new Set(vehicle.passengers.map(p => p.displayStop));
+                let uniqueStopsInTaxiSet = new Set(taxi.passengers.map(p => p.displayStop));
+                let uniqueStopsInTaxiCount = uniqueStopsInTaxiSet.size;
+                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
-                
-                let vehicleLabelPrefix = vehicle.type === 'bus' ? `🚍 Bus #${runningGlobalId}` : `🚖 Taxi #${runningGlobalId}`;
-                let dynamicRouteHeaderTitle = `${vehicleLabelPrefix} — ${cleanAreaLabelName} Manifest`;
+                let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
+                    ? `${cleanAreaLabelName} (Mixed) Manifest` 
+                    : `${majorityArea} Manifest`;
 
                 let countSummaryMap = {};
-                vehicle.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
+                taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
-                let orderedSequenceForVehicle = getCustomRouteSequence(Array.from(uniqueStopsInVehicleSet));
+                let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
 
                 let routePlanStrings = [];
-                orderedSequenceForVehicle.forEach(sName => {
+                orderedSequenceForTaxi.forEach(sName => {
                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
                 });
 
                 let tableRowsHtml = '';
                 let passengerIndexCounter = 1;
 
-                orderedSequenceForVehicle.forEach(sName => {
-                    let stopPassengers = vehicle.passengers.filter(p => p.displayStop === sName);
+                orderedSequenceForTaxi.forEach(sName => {
+                    let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
                     stopPassengers.forEach(r => {
                         let isMinorityRider = r.sourceArea !== majorityArea;
                         let crossAreaBadgeMarkup = isMinorityRider ? `<span class="cross-rider-tag">Pooled from ${r.sourceArea.split(' ')[0]}</span>` : '';
-                        let consolidationBadgeMarkup = r.isConsolidated ? `<span class="hub-consolidation-tag">Consolidated from ${r.initialStop}</span>` : '';
                         let crossRowStyle = isMinorityRider ? `style="background-color: #fffbeb;"` : '';
 
                         tableRowsHtml += `
                             <tr ${crossRowStyle}>
                                 <td><strong>${passengerIndexCounter++}.</strong></td>
                                 <td><span style="background:#eff6ff; color:#1e40af; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:0.8rem;">${r.displayStop}</span></td>
-                                <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup} ${consolidationBadgeMarkup}</td>
+                                <td><strong>${r.name}</strong> ${crossAreaBadgeMarkup}</td>
                                 <td>${r.phone}</td>
                                 <td>${r.visitor_status}</td>
                                 <td>${r.structure}</td>
@@ -649,21 +634,18 @@
                     });
                 });
 
-                let headerClassModifier = vehicle.type === 'bus' ? 'bus-header' : '';
-                let titleClassModifier = vehicle.type === 'bus' ? 'bus-title' : '';
-
                 vehicleBlockElement.innerHTML = `
-                    <div class="vehicle-header-trigger ${headerClassModifier}" onclick="toggleTaxiView(${runningGlobalId})">
-                        <div class="vehicle-title ${titleClassModifier}">
-                            ${dynamicRouteHeaderTitle} 
+                    <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
+                        <div class="vehicle-title">
+                            🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} 
                             <span style="font-weight:normal; font-size:0.95rem; color:#475569;">
-                                (${vehicle.passengers.length}/${vehicle.capacity} seats • 📌 ${uniqueStopsInVehicleSet.size}/${vehicle.maxStops} stops)
+                                (${taxi.passengers.length}/${TAXI_CAPACITY} seats • 📌 ${uniqueStopsInTaxiCount}/${MAX_UNIQUE_STOPS_LIMIT} stops)
                             </span>
                         </div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
                     </div>
                     <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
-                        <div class="stop-summary-inline"><strong>Driver/Bus Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}</div>
+                        <div class="stop-summary-inline"><strong>Driver Route Plan Order:</strong> ${routePlanStrings.join(' ➔ ')}</div>
                         <div style="max-width:100%; overflow-x:auto;">
                             <table>
                                 <thead>
@@ -674,9 +656,10 @@
                         </div>
                     </div>
                 `;
-                targetOutputPane.appendChild(vehicleBlockElement);
+                manifestContainer.appendChild(vehicleBlockElement);
             });
 
+            // PHASE 5: COMPILE UNASSIGNED PASSENGERS CARD CONTAINER
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -703,7 +686,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below required efficiency limits.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers) or cannot fit existing taxis without violating the maximum 8 stops constraint limit.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
@@ -727,11 +710,11 @@
 
     async function downloadExcelBackup() {
         try {
-            const { data: records, error = null } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, service_time, created_at').order('created_at', { ascending: true });
+            const { data: records, error = null } = await churchDb.from('church_signups').select('name, phone, visitor_status, structure, pickup_stop, created_at').order('created_at', { ascending: true });
             if (error) { alert("Error pulling backup: " + error.message); return; }
-            let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Service Track,Signup Date/Time\n";
+            let csvContent = "data:text/csv;charset=utf-8,Full Name,Phone Number,Classification,Structure,Pickup Stop,Signup Date/Time\n";
             records.forEach(r => {
-                let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${r.service_time || 'AM'}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
+                let row = `"${r.name}","${r.phone}","${r.visitor_status}","${r.structure}","${r.pickup_stop}","${new Date(r.created_at).toLocaleString('en-ZA')}"`;
                 csvContent += row + "\n";
             });
             const encodedUri = encodeURI(csvContent);
@@ -752,7 +735,10 @@
         document.getElementById('modalPasswordInputField').focus();
     }
 
-    function closeSecurityModalGate() { document.getElementById('customSecurityModal').style.display = "none"; pendingDeletionId = null; pendingDeletionName = null; }
+    function closeSecurityModalGate() {
+        document.getElementById('customSecurityModal').style.display = "none";
+        pendingDeletionId = null; pendingDeletionName = null;
+    }
 
     async function executeSecureCloudDeletion() {
         const inputPasswordValue = document.getElementById('modalPasswordInputField').value;
@@ -764,24 +750,45 @@
                 if (error) alert("Database error: " + error.message); else fetchAndCompileLogistics();
             } catch(dbErr) { alert("Network error: " + dbErr.message); }
             pendingDeletionId = null; pendingDeletionName = null;
-        } else { document.getElementById('modalErrorMessageBox').style.display = "block"; }
+        } else {
+            document.getElementById('modalErrorMessageBox').style.display = "block";
+        }
     }
 
-    async function triggerCOnfiremWipe() {
-        const { error } = await churchDb.from('church_signups').delete().not('id', 'is', null);
-        if (error) alert("Wipe Exception: " + error.message);
-        else { alert("🗑️ Live database cleared successfully."); fetchAndCompileLogistics(); }
-    }
-
+    // INSTANT MASTER WIPE ENGINE FOR MANUAL CYCLE CLEARS
     async function triggerClearAllGate() {
-        const accessPasswordInput = prompt("⚠️ WARNING: You are about to completely wipe all signups from the live cloud database.\n\nPlease enter the administrative password to confirm action:");
+        const accessPasswordInput = prompt("⚠️ WARNING: You are about to completely wipe the entire signup roster from the live cloud database.\n\nPlease enter the administrative password to confirm action:");
         if (accessPasswordInput === null) return; 
+
         if (accessPasswordInput === ADMIN_PASSWORD) {
-            if (confirm("Are you absolutely sure? This cannot be undone.")) { triggerCOnfiremWipe(); }
-        } else { alert("❌ Incorrect Password. Database wipe aborted."); }
+            const finalWarningConfirmation = confirm("Are you absolutely sure? This will remove all names and reset the dashboard rosters instantly.");
+            if (!finalWarningConfirmation) return;
+
+            const diagnosticBoxHeader = document.getElementById('diagnosticStatus');
+            try {
+                diagnosticBoxHeader.className = "status-good";
+                diagnosticBoxHeader.innerHTML = "⏳ Communicating wipe request with cloud servers...";
+
+                // Universally target all existing rows safely without encountering type cast compilation issues
+                const { error } = await churchDb.from('church_signups').delete().not('id', 'is', null);
+                
+                if (error) {
+                    alert("Database Wipe Exception: " + error.message);
+                } else {
+                    alert("🗑️ Live roster wiped successfully. System reset accomplished.");
+                    fetchAndCompileLogistics();
+                }
+            } catch (networkException) {
+                alert("Network communication dropped: " + networkException.message);
+            }
+        } else {
+            alert("❌ Incorrect Password. Database wipe aborted.");
+        }
     }
 
-    document.getElementById('modalPasswordInputField').addEventListener('keyup', function(e) { if (e.key === 'Enter') executeSecureCloudDeletion(); });
+    document.getElementById('modalPasswordInputField').addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') executeSecureCloudDeletion();
+    });
 
     initializeAdmin();
 </script>
