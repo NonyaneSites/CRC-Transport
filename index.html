@@ -6,7 +6,7 @@
     <title>Church Sunday Transport Portal</title>
     
     <!-- EMBEDDED HIGH-RESOLUTION APPLICATION FAVICON ICON -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛪</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
     
     <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -124,6 +124,15 @@
             </div>
 
             <div class="form-group">
+                <label for="serviceTime">Which Service Are You Attending?</label>
+                <select id="serviceTime" required>
+                    <option value="" disabled selected>-- Choose Service Track --</option>
+                    <option value="AM">🌅 Morning Service (Volunteering Team / Taxis)</option>
+                    <option value="PM">🌆 Evening Service (General Sermon / Busses & Taxis)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label for="visitorStatus">Attendance Classification</label>
                 <select id="visitorStatus" required>
                     <option value="" disabled selected>-- Select Status --</option>
@@ -199,6 +208,33 @@
         "Auckland Park": ["UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"]
     };
 
+    function verifyRegistrationWindow() {
+        const now = new Date();
+        
+        // Forces calculations to run strictly on South African Standard Time (SAST = UTC+2)
+        const targetOffset = 2 * 60 * 60 * 1000;
+        const sastTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + targetOffset);
+        
+        const currentDay = sastTime.getDay();   // 0 = Sunday, 5 = Friday, 6 = Saturday
+        const currentHour = sastTime.getHours();
+
+        // STRICT TIME GATEWAY LOCKOUT: Shuts down precisely at Friday 20:00 (8 PM) SAST
+        if ((currentDay === 5 && currentHour >= 20) || currentDay === 6 || currentDay === 0) {
+            document.getElementById('bookingScreen').innerHTML = `
+                <div style="text-align:center; padding: 40px 10px; color:#dc2626;">
+                    <span style="font-size:3.5rem;">🔒</span>
+                    <h2 style="margin-top:15px; color:#0f172a;">Sign-Ups Are Closed</h2>
+                    <p style="color:#64748b; font-size:0.95rem; line-height:1.5; max-width:400px; margin: 0 auto;">
+                        Transport manifests for this upcoming Sunday locked automatically on Friday at 20:00 (8 PM) SAST. 
+                        Please contact your administrator directly if this is an urgent emergency.
+                    </p>
+                </div>
+            `;
+            return false;
+        }
+        return true;
+    }
+
     function updateStopsDropdown() {
         const areaSelect = document.getElementById('pickupArea');
         const stopSelect = document.getElementById('pickupLocation');
@@ -242,6 +278,10 @@
 
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+        
+        // Final safety interception evaluation pass before hitting cloud resources
+        if (!verifyRegistrationWindow()) return;
+
         const btn = document.getElementById('submitBtn');
         btn.innerText = "Processing Your Seat...";
         btn.disabled = true;
@@ -249,6 +289,7 @@
         const dataPayload = {
             name: document.getElementById('fullName').value.trim(),
             phone: document.getElementById('phone').value.trim(),
+            service_time: document.getElementById('serviceTime').value, // Injected Allocation Track Flag Mapping
             visitor_status: document.getElementById('visitorStatus').value,
             structure: document.getElementById('structure').value.trim(),
             pickup_stop: document.getElementById('pickupLocation').value
@@ -271,7 +312,10 @@
         }
     });
 
-    calculateUpcomingSunday();
+    // Run active schedule evaluation loops upon document mount sequences
+    if (verifyRegistrationWindow()) {
+        calculateUpcomingSunday();
+    }
 </script>
 </body>
 </html>
