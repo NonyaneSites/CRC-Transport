@@ -3,237 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church Transport Registration</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
-    
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root {
-            --primary: #1e40af;
-            --primary-hover: #1d4ed8;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --text: #334155;
-            --border: #cbd5e1;
-        }
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 90vh;
-        }
-        .form-card {
-            background: var(--card);
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
-            width: 100%;
-            max-width: 450px;
-            box-sizing: border-box;
-        }
-        h2 { margin-top: 0; color: #0f172a; text-align: center; font-size: 1.5rem; }
-        p.subtitle { text-align: center; color: #64748b; font-size: 0.9rem; margin-top: -10px; margin-bottom: 25px; }
-        .form-group { margin-bottom: 18px; }
-        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.9rem; color: #475569; }
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1.5px solid var(--border);
-            border-radius: 8px;
-            font-size: 1rem;
-            box-sizing: border-box;
-            transition: border-color 0.2s;
-        }
-        input:focus, select:focus { outline: none; border-color: var(--primary); }
-        button {
-            width: 100%;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-            margin-top: 10px;
-        }
-        button:hover { background: var(--primary-hover); }
-        .status-msg { text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 15px; display: none; }
-        .success { background: #dcfce7; color: #15803d; }
-        .error { background: #fee2e2; color: #b91c1c; }
-    </style>
-</head>
-<body>
-
-<div class="form-card" id="formContainer">
-    <h2>🚖 Sunday Service Transport</h2>
-    <p class="subtitle">Secure your seat inside the weekly compiled rosters</p>
-    
-    <form id="signupForm" onsubmit="handleFormSubmission(event)">
-        <div class="form-group">
-            <label for="fullName">Full Name</label>
-            <input type="text" id="fullName" required placeholder="Enter your first and last name">
-        </div>
-        
-        <div class="form-group">
-            <label for="phoneNumber">Phone Number</label>
-            <input type="tel" id="phoneNumber" required placeholder="e.g. 0821234567">
-        </div>
-        
-        <div class="form-group">
-            <label for="serviceTime">Which Service Are You Attending?</label>
-            <select id="serviceTime" required>
-                <option value="" disabled selected>Choose service track...</option>
-                <option value="AM">🌅 Morning Service (Volunteering Team)</option>
-                <option value="PM">🌆 Evening Service (General Sermon)</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="visitorStatus">Classification</label>
-            <select id="visitorStatus" required>
-                <option value="" disabled selected>Select your status</option>
-                <option value="Member">Member</option>
-                <option value="Visitor">Visitor</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="structureName">Structure / Cell Group</label>
-            <input type="text" id="structureName" required placeholder="e.g. Youth, None, Zone 3">
-        </div>
-        
-        <div class="form-group">
-            <label for="pickupStop">Select Your Pickup Stop</label>
-            <select id="pickupStop" required>
-                <option value="" disabled selected>Choose your exact location...</option>
-                <option value="Ghandi Square">Ghandi Square</option>
-                <option value="Maboneng">Maboneng</option>
-                <option value="Urban Circle">Urban Circle</option>
-                <option value="DFC Bus Stop">DFC Bus Stop</option>
-                <option value="The Fields">The Fields</option>
-                <option value="Saratoga">Saratoga</option>
-                <option value="Gateway">Gateway</option>
-                <option value="Focus 1">Focus 1</option>
-                <option value="Focus 2">Focus 2</option>
-                <option value="Braam">Braam (56 Jorissen, Amani, Apex, Student Digzz, YMCA)</option>
-                <option value="Campus Central on Empire">Campus Central on Empire</option>
-                <option value="Argyle">Argyle</option>
-                <option value="Junction">Junction</option>
-                <option value="Arteria">Arteria</option>
-                <option value="Education Campus">Education Campus</option>
-                <option value="Charlotte Maxeke">Charlotte Maxeke</option>
-                <option value="EOH">EOH</option>
-                <option value="Knockando">Knockando</option>
-                <option value="Gate 7">Gate 7 (Amic Deck, Gate 7)</option>
-                <option value="Yale">Yale</option>
-                <option value="Stanley Avenue">Stanley Avenue</option>
-                <option value="UJ Bunting">UJ Bunting</option>
-                <option value="Laborie">Laborie</option>
-                <option value="Richmond">Richmond</option>
-                <option value="Gate 2">Gate 2</option>
-                <option value="Gate 4">Gate 4</option>
-                <option value="Westdene Engen">Westdene Engen</option>
-                <option value="APK McDonald">APK McDonald</option>
-            </select>
-        </div>
-        
-        <button type="submit" id="submitBtn">Submit Registration</button>
-    </form>
-    
-    <div id="statusNotification" class="status-msg"></div>
-</div>
-
-<script>
-    const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
-    const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
-    let supabaseClient = null;
-
-    function verifyRegistrationWindow() {
-        const now = new Date();
-        const targetOffset = 2 * 60 * 60 * 1000;
-        const sastTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + targetOffset);
-        
-        const currentDay = sastTime.getDay();   
-        const currentHour = sastTime.getHours();
-
-        // Friday 20:00 Cutoff Guard
-        if ((currentDay === 5 && currentHour >= 20) || currentDay === 6 || currentDay === 0) {
-            document.getElementById('formContainer').innerHTML = `
-                <div style="text-align:center; padding: 20px 10px; color:#dc2626;">
-                    <span style="font-size:3.5rem;">🔒</span>
-                    <h2 style="margin-top:15px; color:#0f172a;">Sign-Ups Are Closed</h2>
-                    <p style="color:#64748b; font-size:0.95rem; line-height:1.5; max-width:340px; margin: 0 auto;">
-                        Transport manifests for this upcoming Sunday locked on Friday at 20:00 (8 PM). 
-                        Please contact your administrator directly if this is an urgent emergency.
-                    </p>
-                </div>
-            `;
-            return false;
-        }
-        return true;
-    }
-
-    async function handleFormSubmission(event) {
-        event.preventDefault();
-        if (!verifyRegistrationWindow()) return;
-
-        const submitBtn = document.getElementById('submitBtn');
-        const msgBox = document.getElementById('statusNotification');
-        
-        submitBtn.disabled = true;
-        submitBtn.innerText = "Processing...";
-        msgBox.style.display = "none";
-
-        const payload = {
-            name: document.getElementById('fullName').value.trim(),
-            phone: document.getElementById('phoneNumber').value.trim(),
-            service_time: document.getElementById('serviceTime').value, // AM or PM Track allocation
-            visitor_status: document.getElementById('visitorStatus').value,
-            structure: document.getElementById('structureName').value.trim(),
-            pickup_stop: document.getElementById('pickupStop').value
-        };
-
-        try {
-            const { error } = await supabaseClient.from('church_signups').insert([payload]);
-            if (error) throw error;
-
-            msgBox.className = "status-msg success";
-            msgBox.innerHTML = "🎉 Registration successful! See you on Sunday.";
-            msgBox.style.display = "block";
-            document.getElementById('signupForm').reset();
-        } catch (err) {
-            msgBox.className = "status-msg error";
-            msgBox.innerHTML = "❌ Submission Error: " + err.message;
-            msgBox.style.display = "block";
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerText = "Submit Registration";
-        }
-    }
-
-    if (verifyRegistrationWindow()) {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
-</script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
     
     <!-- EMBEDDED HIGH-RESOLUTION APPLICATION FAVICON ICON -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛪</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
     
     <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -351,6 +124,15 @@
             </div>
 
             <div class="form-group">
+                <label for="serviceTime">Which Service Are You Attending?</label>
+                <select id="serviceTime" required>
+                    <option value="" disabled selected>-- Choose Service Track --</option>
+                    <option value="AM">🌅 Morning Service (Volunteering Team / Taxis)</option>
+                    <option value="PM">🌆 Evening Service (General Sermon / Busses & Taxis)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label for="visitorStatus">Attendance Classification</label>
                 <select id="visitorStatus" required>
                     <option value="" disabled selected>-- Select Status --</option>
@@ -426,6 +208,41 @@
         "Auckland Park": ["UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"]
     };
 
+    function verifyRegistrationWindow() {
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // 🔒 ADMIN BACKDOOR CHECK: If '?override=true' is present in the address bar, skip lockout rules completely
+        if (urlParams.get('override') === 'true') {
+            console.log("🔓 Administrative override active. Time gate bypassed.");
+            return true;
+        }
+
+        const now = new Date();
+        
+        // Forces calculations to run strictly on South African Standard Time (SAST = UTC+2)
+        const targetOffset = 2 * 60 * 60 * 1000;
+        const sastTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + targetOffset);
+        
+        const currentDay = sastTime.getDay();   // 0 = Sunday, 5 = Friday, 6 = Saturday
+        const currentHour = sastTime.getHours();
+
+        // STRICT TIME GATEWAY LOCKOUT: Shuts down precisely at Friday 20:00 (8 PM) SAST
+        if ((currentDay === 5 && currentHour >= 20) || currentDay === 6 || currentDay === 0) {
+            document.getElementById('bookingScreen').innerHTML = `
+                <div style="text-align:center; padding: 40px 10px; color:#dc2626;">
+                    <span style="font-size:3.5rem;">🔒</span>
+                    <h2 style="margin-top:15px; color:#0f172a;">Sign-Ups Are Closed</h2>
+                    <p style="color:#64748b; font-size:0.95rem; line-height:1.5; max-width:400px; margin: 0 auto;">
+                        Transport manifests for this upcoming Sunday locked automatically on Friday at 20:00 (8 PM) SAST. 
+                        Please contact your administrator directly if this is an urgent emergency.
+                    </p>
+                </div>
+            `;
+            return false;
+        }
+        return true;
+    }
+
     function updateStopsDropdown() {
         const areaSelect = document.getElementById('pickupArea');
         const stopSelect = document.getElementById('pickupLocation');
@@ -469,6 +286,10 @@
 
     document.getElementById('transportForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+        
+        // Final safety interception evaluation pass before hitting cloud resources
+        if (!verifyRegistrationWindow()) return;
+
         const btn = document.getElementById('submitBtn');
         btn.innerText = "Processing Your Seat...";
         btn.disabled = true;
@@ -476,6 +297,7 @@
         const dataPayload = {
             name: document.getElementById('fullName').value.trim(),
             phone: document.getElementById('phone').value.trim(),
+            service_time: document.getElementById('serviceTime').value, 
             visitor_status: document.getElementById('visitorStatus').value,
             structure: document.getElementById('structure').value.trim(),
             pickup_stop: document.getElementById('pickupLocation').value
@@ -498,7 +320,10 @@
         }
     });
 
-    calculateUpcomingSunday();
+    // Run active schedule evaluation loops upon document mount sequences
+    if (verifyRegistrationWindow()) {
+        calculateUpcomingSunday();
+    }
 </script>
 </body>
 </html>
