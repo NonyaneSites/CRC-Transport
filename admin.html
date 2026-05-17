@@ -62,7 +62,7 @@
             margin-bottom: 15px;
         }
         
-        /* NOTES APP ACCORDION STYLES */
+        /* VEHICLE MANIFEST ACCORDION STYLES */
         .vehicle-block {
             background: var(--card);
             border: 1px solid #cbd5e1;
@@ -106,7 +106,7 @@
             background: var(--card);
         }
         
-        /* NOTES APP DROPROW STYLE FOR LIMBO */
+        /* UNROSTERED PASSSENGER BOX STYLES */
         .limbo-block {
             background: var(--limbo-bg);
             border: 1px solid var(--limbo-border);
@@ -181,7 +181,7 @@
             font-size: 1rem;
         }
 
-        /* CUSTOM MODAL OVERLAYS */
+        /* SECURITY VERIFICATION DIALOGS */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -262,19 +262,18 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // MASTER CHRONOLOGICAL SEQUENCE PATHWAY ARRANGEMENT
+    // GLOBAL SEQUENTIAL ROUTE DESIGN LIST
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
-        "Braam", "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
+        "56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7",
+        "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
     ];
-
-    const EXCLUSIVE_BRAAM_STOPS = ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"];
 
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
-        "Braam": "Braam Route",
+        "56 Jorissen": "Braam Route", "Amani": "Braam Route", "Amic Deck": "Braam Route", "Apex": "Braam Route", "Student Digzz": "Braam Route", "YMCA": "Braam Route", "Gate 7": "Braam Route",
         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
     };
 
@@ -285,7 +284,6 @@
     function initializeAdmin() {
         try {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            document.getElementById('diagnosticStatus').innerHTML = "✅ Secure driver connected. Fetching live cloud rows...";
             fetchAndCompileLogistics();
             calculateUpcomingSunday();
         } catch(err) {
@@ -338,15 +336,15 @@
         }
     }
 
-    // Mathematical subset summation solver to locate perfect capacity fits internally per route region
-    function findPerfectSubset(stopGroups, targetCapacity) {
-        for (let i = 1; i < (1 << stopGroups.length); i++) {
+    // Mathematical combination solver to bundle whole-stop groups into pure 17-seat packages
+    function findPerfectSubset(stops, targetCapacity) {
+        for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
             let subset = [];
-            for (let j = 0; j < stopGroups.length; j++) {
+            for (let j = 0; j < stops.length; j++) {
                 if (i & (1 << j)) {
-                    sum += stopGroups[j].passengers.length;
-                    subset.push(stopGroups[j]);
+                    sum += stops[j].passengers.length;
+                    subset.push(stops[j]);
                 }
             }
             if (sum === targetCapacity) return subset;
@@ -354,16 +352,49 @@
         return null;
     }
 
+    // Tie-Breaker Algorithm: Evaluates least stops and sequential path proximity
+    function selectBestTaxiByRules(taxisList, currentStopIndex) {
+        let minStopsCount = Math.min(...taxisList.map(t => {
+            return new Set(t.passengers.map(p => p.displayStop)).size;
+        }));
+        
+        let lowestStopsTaxis = taxisList.filter(t => {
+            return new Set(t.passengers.map(p => p.displayStop)).size === minStopsCount;
+        });
+
+        if (lowestStopsTaxis.length === 1) return lowestStopsTaxis[0];
+
+        let bestTaxiInstance = null;
+        let minimumPathDistance = Infinity;
+
+        lowestStopsTaxis.forEach(t => {
+            t.passengers.forEach(p => {
+                let existingStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop);
+                let currentDistance = Math.abs(existingStopIndex - currentStopIndex);
+                if (currentDistance < minimumPathDistance) {
+                    minimumPathDistance = currentDistance;
+                    bestTaxiInstance = t;
+                }
+            });
+        });
+
+        return bestTaxiInstance || lowestStopsTaxis[0];
+    }
+
     async function fetchAndCompileLogistics() {
+        const statusHeader = document.getElementById('diagnosticStatus');
         try {
+            statusHeader.className = "status-good";
+            statusHeader.innerHTML = "🔄 Synchronizing live database rows...";
+
             const { data: records, error } = await churchDb.from('church_signups').select('*').order('created_at', { ascending: true });
             if (error) {
-                document.getElementById('diagnosticStatus').className = "status-bad";
-                document.getElementById('diagnosticStatus').innerHTML = "🚨 Database Error: " + error.message;
+                statusHeader.className = "status-bad";
+                statusHeader.innerHTML = "🚨 Database Error: " + error.message;
                 return;
             }
 
-            // PASS 0: AUTOMATIC REAL-TIME DEDUPLICATION FILTER (Filters by lowercase trimmed fullName)
+            // PASSTHROUGH 0: AUTOMATIC CLOUD DATA DE-DUPLICATION
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -382,11 +413,12 @@
             limboSectionContainer.innerHTML = '';
 
             if(deduplicatedRecords.length === 0) {
+                statusHeader.innerHTML = "🟢 Sync Verified. Real-time database is currently empty.";
                 manifestContainer.innerHTML = '<p style="text-align:center; padding:20px; color:#94a3b8;">No records active.</p>';
                 return;
             }
 
-            // STRING HARMONIZATION PIPELINE
+            // CHECKPOINT DATA SANITIZATION PIPELINE
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
                 
@@ -395,16 +427,13 @@
                 if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
                 if (dbStopRaw.toLowerCase() === "uj bunting") dbStopRaw = "UJ Bunting";
 
-                let displayStop = dbStopRaw;
-                if (EXCLUSIVE_BRAAM_STOPS.some(s => s.toLowerCase() === dbStopRaw.toLowerCase())) {
-                    displayStop = "Braam";
-                }
-
+                let displayStop = "Unknown";
                 let mappedArea = "Unknown Route";
-                for (let [stopKey, areaValue] of Object.entries(AREA_MAPPING)) {
-                    if (stopKey.toLowerCase() === displayStop.toLowerCase()) {
-                        displayStop = stopKey; 
-                        mappedArea = areaValue;
+
+                for (let i = 0; i < MASTER_ROUTE_SEQUENCE.length; i++) {
+                    if (MASTER_ROUTE_SEQUENCE[i].toLowerCase() === dbStopRaw.toLowerCase()) {
+                        displayStop = MASTER_ROUTE_SEQUENCE[i];
+                        mappedArea = AREA_MAPPING[MASTER_ROUTE_SEQUENCE[i]];
                         break;
                     }
                 }
@@ -413,98 +442,109 @@
 
             let finalizedTaxis = [];
 
-            // PASS 1: ISOLATE SINGLE CHECKPOINTS EXCEEDING CAPACITY LIMITS (>=17)
-            MASTER_ROUTE_SEQUENCE.forEach(sName => {
-                let matchingRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-                while (matchingRiders.length >= TAXI_CAPACITY) {
-                    let fullBatch = matchingRiders.splice(0, TAXI_CAPACITY);
-                    fullBatch.forEach(p => p.assigned = true);
-                    finalizedTaxis.push({ passengers: fullBatch });
+            // AGGREGATE PASSENGERS INTO GRANULAR STOP ENTITIES
+            let stopMap = {};
+            workingPool.forEach(p => {
+                if (!stopMap[p.displayStop]) {
+                    stopMap[p.displayStop] = {
+                        stopName: p.displayStop,
+                        sourceArea: p.sourceArea,
+                        passengers: [],
+                        sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop)
+                    };
                 }
+                stopMap[p.displayStop].passengers.push(p);
             });
+            let allStopsList = Object.values(stopMap);
 
-            // PASS 2: INTRA-AREA COHESION MATCHING (Locates groups inside one area that fit perfectly into a 17-seater)
-            let uniqueAreas = ["Braam Route", "Auckland Park Route", "CBD Route", "Parktown Route"];
+            // PHASE 1: REGIONAL PURE 17-SEATER COMBINATORIAL OPTIMIZATION
+            let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
             uniqueAreas.forEach(areaName => {
-                let perfectMatchFound = true;
-                while (perfectMatchFound) {
-                    let unassignedAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
-                    let activeStops = [];
-                    MASTER_ROUTE_SEQUENCE.forEach(sName => {
-                        let stopRiders = unassignedAreaRiders.filter(p => p.displayStop === sName);
-                        if (stopRiders.length > 0) activeStops.push({ stopName: sName, passengers: stopRiders });
-                    });
-
-                    let targetSubset = findPerfectSubset(activeStops, TAXI_CAPACITY);
-                    if (targetSubset) {
-                        let taxiContent = [];
-                        targetSubset.forEach(group => {
-                            group.passengers.forEach(p => { p.assigned = true; taxiContent.push(p); });
+                let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
+                let processingArea = true;
+                while (processingArea) {
+                    let unallocatedAreaStops = areaStops.filter(s => s.passengers.every(p => !p.assigned));
+                    let perfectSubset = findPerfectSubset(unallocatedAreaStops, TAXI_CAPACITY);
+                    if (perfectSubset) {
+                        let taxiPassengers = [];
+                        perfectSubset.forEach(stop => {
+                            stop.passengers.forEach(p => { p.assigned = true; taxiPassengers.push(p); });
                         });
-                        finalizedTaxis.push({ passengers: taxiContent });
+                        finalizedTaxis.push({ passengers: taxiPassengers });
                     } else {
-                        perfectMatchFound = false;
+                        processingArea = false;
                     }
                 }
             });
 
-            // PASS 3: STANDALONE AREA SURVIVAL CHECK (If remaining area passengers totals 14-17, keep them together)
-            uniqueAreas.forEach(areaName => {
-                let remainingAreaRiders = workingPool.filter(p => !p.assigned && p.sourceArea === areaName);
-                if (remainingAreaRiders.length >= MIN_PASSENGER_FLOOR && remainingAreaRiders.length <= TAXI_CAPACITY) {
-                    remainingAreaRiders.forEach(p => p.assigned = true);
-                    finalizedTaxis.push({ passengers: remainingAreaRiders });
+            // PHASE 2: SEQUENTIAL PACKING WITH LIVE TIE-BREAKING ALGORITHM
+            let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
+            remainingStops.sort((a, b) => {
+                if (a.sourceArea !== b.sourceArea) {
+                    return uniqueAreas.indexOf(a.sourceArea) - uniqueAreas.indexOf(b.sourceArea);
                 }
+                return a.sequenceIndex - b.sequenceIndex;
             });
 
-            // PASS 4: GEOGRAPHICALLY CHRONOLOGICAL CROSS-POOL FILLER FOR REMAINING BACKLOGS
-            let globalLeftoverStops = [];
-            MASTER_ROUTE_SEQUENCE.forEach(sName => {
-                let unassignedRiders = workingPool.filter(p => !p.assigned && p.displayStop === sName);
-                if (unassignedRiders.length > 0) globalLeftoverStops.push({ stopName: sName, passengers: unassignedRiders });
-            });
+            remainingStops.forEach(stop => {
+                let unassignedRiders = stop.passengers.filter(p => !p.assigned);
+                if (unassignedRiders.length === 0) return;
 
-            while (globalLeftoverStops.length > 0) {
-                let currentTaxi = { passengers: [] };
-                let seedGroup = globalLeftoverStops.shift();
-                currentTaxi.passengers.push(...seedGroup.passengers);
+                let P = unassignedRiders.length;
+                let openTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
+                let chosenTaxi = null;
 
-                while (currentTaxi.passengers.length < TAXI_CAPACITY && globalLeftoverStops.length > 0) {
-                    let openSeats = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    let matchIndex = globalLeftoverStops.findIndex(g => g.passengers.length === openSeats);
-
-                    if (matchIndex === -1) {
-                        let validWholeFits = globalLeftoverStops.map((g, idx) => ({ g, idx })).filter(item => item.g.passengers.length <= openSeats);
-                        if (validWholeFits.length > 0) {
-                            validWholeFits.sort((a, b) => b.g.passengers.length - a.g.passengers.length);
-                            matchIndex = validWholeFits[0].idx;
+                if (openTaxis.length > 0) {
+                    // Rule 2a: Perfect Fit matching remaining seats exactly
+                    let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
+                    if (perfectFitTaxis.length > 0) {
+                        chosenTaxi = selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex);
+                    } else {
+                        // Rule 2b: Standard fit filtering by available capacity bounds
+                        let candidateTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) >= P);
+                        if (candidateTaxis.length > 0) {
+                            chosenTaxi = selectBestTaxiByRules(candidateTaxis, stop.sequenceIndex);
                         }
                     }
+                }
 
-                    if (matchIndex === -1) {
-                        let nextGroup = globalLeftoverStops[0];
-                        let sliceBatch = nextGroup.passengers.splice(0, openSeats);
-                        currentTaxi.passengers.push(...sliceBatch);
-                        if (nextGroup.passengers.length === 0) globalLeftoverStops.shift();
-                    } else {
-                        let matchedGroup = globalLeftoverStops.splice(matchIndex, 1)[0];
-                        currentTaxi.passengers.push(...matchedGroup.passengers);
+                if (chosenTaxi) {
+                    unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
+                } else {
+                    // Rule 2c: Allocation fallback partition split or new car initiation
+                    while (unassignedRiders.length > 0) {
+                        let currentOpenTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
+                        let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
+                        
+                        if (fitTaxi) {
+                            let chunk = unassignedRiders.splice(0, unassignedRiders.length);
+                            chunk.forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
+                        } else {
+                            let newTaxi = { passengers: [] };
+                            finalizedTaxis.push(newTaxi);
+                            let seatsAvailable = TAXI_CAPACITY;
+                            let chunk = unassignedRiders.splice(0, seatsAvailable);
+                            chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
+                        }
                     }
                 }
+            });
 
-                if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    finalizedTaxis.push(currentTaxi);
+            // PHASE 3: LOW EFFICIENCY TRIMMING POST ALLOCATION SWEEP
+            finalizedTaxis = finalizedTaxis.filter(taxi => {
+                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    return true;
                 } else {
-                    currentTaxi.passengers.forEach(p => p.assigned = false);
+                    taxi.passengers.forEach(p => p.assigned = false);
+                    return false;
                 }
-            }
+            });
 
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
-
-            // PHASE 5: INTERFACE ACCORDION MANIFEST RENDERER
             let globalTaxiCounter = 1;
 
+            // PHASE 4: UI MANIFEST INTERFACE DESIGN GENERATION
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -514,12 +554,18 @@
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
+                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
+                let cleanAreaLabelName = majorityArea.replace(" Route", "");
+                let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
+                    ? `${cleanAreaLabelName} (Mixed) Manifest` 
+                    : `${majorityArea} Manifest`;
+
                 let countSummaryMap = {};
                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
                 let routePlanStrings = [];
                 MASTER_ROUTE_SEQUENCE.forEach(sName => {
-                    if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} pax)`);
+                    if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
                 });
 
                 let tableRowsHtml = '';
@@ -548,7 +594,7 @@
 
                 vehicleBlockElement.innerHTML = `
                     <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
-                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${majorityArea} Manifest <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
+                        <div class="vehicle-title">🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} <span style="font-weight:normal; font-size:0.95rem; color:#475569;">(${taxi.passengers.length}/${TAXI_CAPACITY} seats filled)</span></div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
                     </div>
                     <div class="vehicle-collapsible-content" id="taxi-content-${runningGlobalId}">
@@ -566,7 +612,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 6: LIMBO FIELD DISPLAY
+            // PHASE 5: UNASSIGNED PASSSENGER LIMBO RENDERING
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -606,8 +652,11 @@
                 `;
                 limboSectionContainer.appendChild(limboDiv);
             }
+
+            statusHeader.innerHTML = "🟢 Cloud synchronization verified. Data is live.";
         } catch(err) {
-            alert("Exception parsing registers.");
+            statusHeader.className = "status-bad";
+            statusHeader.innerHTML = "🚨 Operational Exception: " + err.message;
             console.error(err);
         }
     }
