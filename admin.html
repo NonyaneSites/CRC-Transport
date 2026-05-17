@@ -262,18 +262,18 @@
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
 
-    // GLOBAL SEQUENTIAL ROUTE DESIGN LIST
+    // COMPRESSED CHRONOLOGICAL SEQUENTIAL PATH WITH MASTER HUBS
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
-        "56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7",
+        "Braam", "Gate 7",
         "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
     ];
 
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
-        "56 Jorissen": "Braam Route", "Amani": "Braam Route", "Amic Deck": "Braam Route", "Apex": "Braam Route", "Student Digzz": "Braam Route", "YMCA": "Braam Route", "Gate 7": "Braam Route",
+        "Braam": "Braam Route", "Gate 7": "Braam Route",
         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
     };
 
@@ -336,7 +336,7 @@
         }
     }
 
-    // Mathematical combination solver to bundle whole-stop groups into pure 17-seat packages
+    // Combinatorial packer identifying optimal whole stop combinations hitting exactly 17
     function findPerfectSubset(stops, targetCapacity) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
@@ -352,7 +352,7 @@
         return null;
     }
 
-    // Tie-Breaker Algorithm: Evaluates least stops and sequential path proximity
+    // Advanced tie breaker enforcing minimum stop complexity and index proximity rules
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
         let minStopsCount = Math.min(...taxisList.map(t => {
             return new Set(t.passengers.map(p => p.displayStop)).size;
@@ -394,7 +394,7 @@
                 return;
             }
 
-            // PASSTHROUGH 0: AUTOMATIC CLOUD DATA DE-DUPLICATION
+            // PASS 0: AUTOMATIC CLOUD INGESTION DE-DUPLICATION
             let uniqueSeenNames = new Set();
             let deduplicatedRecords = [];
             records.forEach(r => {
@@ -418,20 +418,30 @@
                 return;
             }
 
-            // CHECKPOINT DATA SANITIZATION PIPELINE
+            // CONSOLIDATION LAYER FOR BRAAM SUPER-HUBS AND SUB-STOPS
             let workingPool = deduplicatedRecords.map(r => {
-                let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim() : "";
+                let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
-                if (dbStopRaw.toLowerCase() === "ghandi" || dbStopRaw.toLowerCase() === "ghandi square") dbStopRaw = "Ghandi Square";
-                if (dbStopRaw.toLowerCase() === "education" || dbStopRaw.toLowerCase() === "education campus") dbStopRaw = "Education Campus";
-                if (dbStopRaw.toLowerCase() === "apk mcdonalds" || dbStopRaw.toLowerCase() === "apk mcdonald's" || dbStopRaw.toLowerCase() === "apk mcdonald") dbStopRaw = "APK McDonald";
-                if (dbStopRaw.toLowerCase() === "uj bunting") dbStopRaw = "UJ Bunting";
+                // Consolidation Logic Rules applied directly
+                if (["56 jorissen", "amani", "apex", "student digzz", "ymca", "braam"].includes(dbStopRaw)) {
+                    dbStopRaw = "braam";
+                } else if (["amic deck", "gate 7"].includes(dbStopRaw)) {
+                    dbStopRaw = "gate 7";
+                } else if (dbStopRaw === "ghandi" || dbStopRaw === "ghandi square") {
+                    dbStopRaw = "ghandi square";
+                } else if (dbStopRaw === "education" || dbStopRaw === "education campus") {
+                    dbStopRaw = "education campus";
+                } else if (["apk mcdonalds", "apk mcdonald's", "apk mcdonald"].includes(dbStopRaw)) {
+                    dbStopRaw = "apk mcdonald";
+                } else if (dbStopRaw === "uj bunting") {
+                    dbStopRaw = "uj bunting";
+                }
 
                 let displayStop = "Unknown";
                 let mappedArea = "Unknown Route";
 
                 for (let i = 0; i < MASTER_ROUTE_SEQUENCE.length; i++) {
-                    if (MASTER_ROUTE_SEQUENCE[i].toLowerCase() === dbStopRaw.toLowerCase()) {
+                    if (MASTER_ROUTE_SEQUENCE[i].toLowerCase() === dbStopRaw) {
                         displayStop = MASTER_ROUTE_SEQUENCE[i];
                         mappedArea = AREA_MAPPING[MASTER_ROUTE_SEQUENCE[i]];
                         break;
@@ -442,7 +452,7 @@
 
             let finalizedTaxis = [];
 
-            // AGGREGATE PASSENGERS INTO GRANULAR STOP ENTITIES
+            // COMPILE LOCAL PASSENGER LIST GROUPS
             let stopMap = {};
             workingPool.forEach(p => {
                 if (!stopMap[p.displayStop]) {
@@ -457,7 +467,7 @@
             });
             let allStopsList = Object.values(stopMap);
 
-            // PHASE 1: REGIONAL PURE 17-SEATER COMBINATORIAL OPTIMIZATION
+            // PHASE 1: PROCESS WHOLE SUBSETS FORMING EXACTLY 17 SEATS WITHIN SAME REIGON
             let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
             uniqueAreas.forEach(areaName => {
                 let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
@@ -477,7 +487,7 @@
                 }
             });
 
-            // PHASE 2: SEQUENTIAL PACKING WITH LIVE TIE-BREAKING ALGORITHM
+            // PHASE 2: GREEDY ALLOCATION WITH CRITICAL UNFILLED TAXI CONFIGURATIONS
             let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
             remainingStops.sort((a, b) => {
                 if (a.sourceArea !== b.sourceArea) {
@@ -495,12 +505,12 @@
                 let chosenTaxi = null;
 
                 if (openTaxis.length > 0) {
-                    // Rule 2a: Perfect Fit matching remaining seats exactly
+                    // Match Exact Remaining Open Capacity Block Space 
                     let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
                     if (perfectFitTaxis.length > 0) {
                         chosenTaxi = selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex);
                     } else {
-                        // Rule 2b: Standard fit filtering by available capacity bounds
+                        // Standard Cap Match Applying Proximity/Least Stop Rule
                         let candidateTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) >= P);
                         if (candidateTaxis.length > 0) {
                             chosenTaxi = selectBestTaxiByRules(candidateTaxis, stop.sequenceIndex);
@@ -511,7 +521,7 @@
                 if (chosenTaxi) {
                     unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
                 } else {
-                    // Rule 2c: Allocation fallback partition split or new car initiation
+                    // Split / Spillover distribution loop block
                     while (unassignedRiders.length > 0) {
                         let currentOpenTaxis = finalizedTaxis.filter(t => t.passengers.length < TAXI_CAPACITY);
                         let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
@@ -530,7 +540,7 @@
                 }
             });
 
-            // PHASE 3: LOW EFFICIENCY TRIMMING POST ALLOCATION SWEEP
+            // PHASE 3: EVALUATE MANIFEST SEAT COUNT AGAINST CAPACITY CUTOFF MINIMUMS
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -544,7 +554,7 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 4: UI MANIFEST INTERFACE DESIGN GENERATION
+            // PHASE 4: RE-RENDER GRAPHIC CONSOLE ROSTERS
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -612,7 +622,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: UNASSIGNED PASSSENGER LIMBO RENDERING
+            // PHASE 5: RUN UNASSIGNED LIMBO OUTPUT MODULE
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
