@@ -106,7 +106,7 @@
             background: var(--card);
         }
         
-        /* UNROSTERED PASSSENGER BOX STYLES */
+        /* UNROSTERED PASSENGER BOX STYLES */
         .limbo-block {
             background: var(--limbo-bg);
             border: 1px solid var(--limbo-border);
@@ -261,19 +261,18 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER CONSTRAINT RULE
+    const MAX_UNIQUE_STOPS_LIMIT = 8; // HARD CONSTRAINT RULE
 
-    // COMPRESSED CHRONOLOGICAL SEQUENTIAL PATH WITH MASTER HUBS
+    // UPDATED COMPRESSED CHRONOLOGICAL SEQUENTIAL PATH WITH MASTER HUBS
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
-        "Campus Central on Empire", "Argyle", "Junction", "Education Campus", "Arteria", "Charlotte Maxeke", "EOH", "Knockando",
-        "Braam", "Gate 7",
+        "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
         "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
     ];
 
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
-        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Education Campus": "Parktown Route", "Arteria": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Arteria": "Parktown Route", "Education Campus": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route", "Gate 7": "Braam Route",
         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
     };
@@ -335,6 +334,20 @@
             targetBadge.style.background = "#ffe4e6";
             targetBadge.style.color = "#9f1239";
         }
+    }
+
+    // DYNAMIC CONDITIONAL ROUTE SEQUENCER: Enforces localized re-ordering rules dynamically per vehicle
+    function getCustomRouteSequence(taxiStopsList) {
+        let sequence = [...MASTER_ROUTE_SEQUENCE];
+        if (taxiStopsList.includes("Charlotte Maxeke") && taxiStopsList.includes("Education Campus") && taxiStopsList.includes("Arteria")) {
+            let idxArteria = sequence.indexOf("Arteria");
+            let idxEdu = sequence.indexOf("Education Campus");
+            if (idxEdu > idxArteria) {
+                sequence.splice(idxEdu, 1);
+                sequence.splice(idxArteria, 0, "Education Campus");
+            }
+        }
+        return sequence;
     }
 
     // Combinatorial subset packer identifying pure regional solutions that respect the 8-stop cap
@@ -423,7 +436,7 @@
                 return;
             }
 
-            // DATA NORMALIZATION LAYER FOR BRAAM SUPER-HUBS AND GENERAL PICKUPS
+            // DATA NORMALIZATION LAYER FOR BRAAM SUPER-HUBS AND SUB-STOPS
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
@@ -435,6 +448,8 @@
                     dbStopRaw = "ghandi square";
                 } else if (dbStopRaw === "education" || dbStopRaw === "education campus") {
                     dbStopRaw = "education campus";
+                } else if (dbStopRaw === "campus central" || dbStopRaw === "campus central on empire") {
+                    dbStopRaw = "campus central on empire";
                 } else if (["apk mcdonalds", "apk mcdonald's", "apk mcdonald"].includes(dbStopRaw)) {
                     dbStopRaw = "apk mcdonald";
                 } else if (dbStopRaw === "uj bunting") {
@@ -553,7 +568,7 @@
                             finalizedTaxis.push(newTaxi);
                             let seatsToTake = Math.min(TAXI_CAPACITY, unassignedRiders.length);
                             let chunk = unassignedRiders.splice(0, seatsToTake);
-                            chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
+                            chunk.forEach(p => { p.assigned = true; newTaxi.push(p); });
                         }
                     }
                 }
@@ -573,7 +588,7 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 4: UI MANIFEST INTERFACE GENERATOR
+            // PHASE 4: UI MANIFEST INTERFACE GENERATOR (Respects conditional sub-route adjustments)
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -583,7 +598,8 @@
                 taxi.passengers.forEach(p => { areaTallyMap[p.sourceArea] = (areaTallyMap[p.sourceArea] || 0) + 1; });
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
-                let uniqueStopsInTaxiCount = new Set(taxi.passengers.map(p => p.displayStop)).size;
+                let uniqueStopsInTaxiSet = new Set(taxi.passengers.map(p => p.displayStop));
+                let uniqueStopsInTaxiCount = uniqueStopsInTaxiSet.size;
                 let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
@@ -593,15 +609,18 @@
                 let countSummaryMap = {};
                 taxi.passengers.forEach(p => { countSummaryMap[p.displayStop] = (countSummaryMap[p.displayStop] || 0) + 1; });
                 
+                // GENERATE DYNAMIC CHRONOLOGICAL ORDERING FOR VEHICLE ROUTE PLAN
+                let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
+
                 let routePlanStrings = [];
-                MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                orderedSequenceForTaxi.forEach(sName => {
                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
                 });
 
                 let tableRowsHtml = '';
                 let passengerIndexCounter = 1;
 
-                MASTER_ROUTE_SEQUENCE.forEach(sName => {
+                orderedSequenceForTaxi.forEach(sName => {
                     let stopPassengers = taxi.passengers.filter(p => p.displayStop === sName);
                     stopPassengers.forEach(r => {
                         let isMinorityRider = r.sourceArea !== majorityArea;
