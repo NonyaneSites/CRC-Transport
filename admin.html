@@ -256,7 +256,7 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8;
+    const MAX_UNIQUE_STOPS_LIMIT = 8; 
 
     // GEOGRAPHICAL ROUTE MAP ORDER
     const MASTER_ROUTE_SEQUENCE = [
@@ -346,34 +346,6 @@
         return sequence;
     }
 
-    function selectBestTaxiByRules(taxisList, currentStopIndex) {
-        let minStopsCount = Math.min(...taxisList.map(t => {
-            return new Set(t.passengers.map(p => p.displayStop)).size;
-        }));
-        
-        let lowestStopsTaxis = taxisList.filter(t => {
-            return new Set(t.passengers.map(p => p.displayStop)).size === minStopsCount;
-        });
-
-        if (lowestStopsTaxis.length === 1) return lowestStopsTaxis[0];
-
-        let bestTaxiInstance = null;
-        let minimumPathDistance = Infinity;
-
-        lowestStopsTaxis.forEach(t => {
-            t.passengers.forEach(p => {
-                let existingStopIndex = MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop);
-                let currentDistance = Math.abs(existingStopIndex - currentStopIndex);
-                if (currentDistance < minimumPathDistance) {
-                    minimumPathDistance = currentDistance;
-                    bestTaxiInstance = t;
-                }
-            });
-        });
-
-        return bestTaxiInstance || lowestStopsTaxis[0];
-    }
-
     async function fetchAndCompileLogistics() {
         const statusHeader = document.getElementById('diagnosticStatus');
         try {
@@ -444,7 +416,7 @@
 
             let finalizedTaxis = [];
 
-            // PHASE 1: FILL DIRECT ANCHORS (GROUPS OF EXACT 17 FROM A SINGLE Hub)
+            // PHASE 1: FILL DIRECT ANCHORS (GROUPS OF EXACT 17 FROM A SINGLE Hub like Braam)
             MASTER_ROUTE_SEQUENCE.forEach(stopName => {
                 let stopPassengers = workingPool.filter(p => p.displayStop === stopName);
                 while (stopPassengers.length >= TAXI_CAPACITY) {
@@ -461,60 +433,73 @@
                 finalizedTaxis.push({ passengers: chunk });
             }
 
-            // PHASE 2: POOL UNASSIGNED LEFTOVERS IN STRICT GEOGRAPHICAL ROUTE TIMELINE SWEEP ORDER
-            let leftoverPassengersPool = [];
+            // PHASE 2: PREPARE REMAINING GROUPS
+            let remainingGroups = [];
             MASTER_ROUTE_SEQUENCE.forEach(stopName => {
                 let remaining = workingPool.filter(p => p.displayStop === stopName && !p.assigned);
-                leftoverPassengersPool.push(...remaining);
+                if (remaining.length > 0) {
+                    remainingGroups.push({ stopName: stopName, passengers: remaining });
+                }
             });
             let remainingUnknown = workingPool.filter(p => p.displayStop === "Unknown" && !p.assigned);
-            leftoverPassengersPool.push(...remainingUnknown);
-
-            // PHASE 3: BALANCED CAPACITY SIZE ALLOCATION ENGINE (STRICT 14 MINIMUM FLOOR CHECK)
-            let T = leftoverPassengersPool.length;
-            let targetSizes = [];
-            let remainingCount = T;
-
-            while (remainingCount >= TAXI_CAPACITY) {
-                targetSizes.push(TAXI_CAPACITY);
-                remainingCount -= TAXI_CAPACITY;
+            if (remainingUnknown.length > 0) {
+                remainingGroups.push({ stopName: "Unknown", passengers: remainingUnknown });
             }
 
-            if (remainingCount > 0) {
-                if (remainingCount >= MIN_PASSENGER_FLOOR) {
-                    targetSizes.push(remainingCount);
-                } else {
-                    // Back-balance: borrow empty slots from preceding vehicles to lift the trailing remainder up to 14
-                    let need = MIN_PASSENGER_FLOOR - remainingCount;
-                    let maxBorrowablePerCar = TAXI_CAPACITY - MIN_PASSENGER_FLOOR; // 17 - 14 = 3
-                    let totalAvailableToBorrow = targetSizes.length * maxBorrowablePerCar;
+            // PHASE 3: GREEDY LOOKAHEAD ALLOCATION (PREVENTS SPLITS BY SKIPPING TO SMALLER STOPS)
+            while(remainingGroups.length > 0) {
+                let currentTaxi = { passengers: [] };
+                let i = 0;
 
-                    if (need <= totalAvailableToBorrow) {
-                        for (let i = targetSizes.length - 1; i >= 0 && need > 0; i--) {
-                            let borrowAmount = Math.min(maxBorrowablePerCar, need);
-                            targetSizes[i] -= borrowAmount;
-                            need -= borrowAmount;
-                        }
-                        targetSizes.push(MIN_PASSENGER_FLOOR);
+                while (i < remainingGroups.length && currentTaxi.passengers.length < TAXI_CAPACITY) {
+                    let group = remainingGroups[i];
+                    let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
+
+                    // Does the ENTIRE stop group fit into the available seats?
+                    if (group.passengers.length <= seatsAvailable) {
+                        group.passengers.forEach(p => {
+                            p.assigned = true;
+                            currentTaxi.passengers.push(p);
+                        });
+                        remainingGroups.splice(i, 1); // Remove it completely, don't increment i
                     } else {
-                        // If it's mathematically impossible to make a valid taxi, leave the remainder for Limbo box
+                        // The group is too big. Skip it to keep it whole, look down the route for a smaller group.
+                        i++;
                     }
                 }
+
+                // EMERGENCY SPLIT PROTOCOL:
+                // If after sweeping all groups, the taxi couldn't even reach 14 people
+                // AND there are still groups left on the route, we are forced to split the next group.
+                if (currentTaxi.passengers.length < MIN_PASSENGER_FLOOR && remainingGroups.length > 0) {
+                    let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    let targetGroup = remainingGroups[0]; 
+
+                    let splitChunk = targetGroup.passengers.splice(0, seatsAvailable);
+                    splitChunk.forEach(p => {
+                        p.assigned = true;
+                        currentTaxi.passengers.push(p);
+                    });
+                    // targetGroup retains its leftover passengers for the next taxi round
+                }
+
+                finalizedTaxis.push(currentTaxi);
             }
 
-            // PHASE 4: EXECUTE SEQUENTIAL ASSIGNMENTS TO VEHICLE MANIFESTS
-            let poolIndex = 0;
-            targetSizes.forEach(size => {
-                let chunk = leftoverPassengersPool.slice(poolIndex, poolIndex + size);
-                chunk.forEach(p => p.assigned = true);
-                finalizedTaxis.push({ passengers: chunk });
-                poolIndex += size;
+            // PHASE 4: FILTER UNDERSIZED TAXIS TO LIMBO
+            finalizedTaxis = finalizedTaxis.filter(taxi => {
+                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    return true;
+                } else {
+                    taxi.passengers.forEach(p => p.assigned = false);
+                    return false;
+                }
             });
 
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 5: UI MANIFEST INTERFACE GENERATION PIPELINE
+            // UI LOGISTICS MONITOR DISPLAY COMPILATION GENERATION
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
