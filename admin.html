@@ -256,7 +256,7 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8;
+    const MAX_UNIQUE_STOPS_LIMIT = 8; 
 
     // IDEAL GEOGRAPHICAL MASTER ROUTE TIMELINE SWEEP SEQUENCE ORDER
     const MASTER_ROUTE_SEQUENCE = [
@@ -456,7 +456,7 @@
             });
             let allStopsList = Object.values(stopMap);
 
-            // COMPILE ALL STOPS IN STRICT IDEAL CHRONOLOGICAL ROUTE TIMELINE ORDER
+            // COMPILE ALL STOPS IN STRICT IDEAL CHRONOLOGICAL ROUTE TIMELINE ORDER (EXCLUDES UNKNOWN)
             let orderedActiveStops = [];
             MASTER_ROUTE_SEQUENCE.forEach(stopName => {
                 let match = allStopsList.find(s => s.stopName === stopName);
@@ -464,10 +464,6 @@
                     orderedActiveStops.push(match);
                 }
             });
-            let unknownMatch = allStopsList.find(s => s.stopName === "Unknown");
-            if (unknownMatch && unknownMatch.passengers.length > 0) {
-                orderedActiveStops.push(unknownMatch);
-            }
 
             let finalizedTaxis = [];
             let currentTaxi = { passengers: [] };
@@ -493,18 +489,16 @@
                 }
             });
 
-            // STEP 2: REWRITTEN SEQUENTIAL LINEAR ROUTE SWEEP ENGINE (ANTI-SPLIT MECHANISM)
+            // STEP 2: SEQUENTIAL LINEAR ROUTE SWEEP ENGINE (ANTI-SPLIT LOGISTICS RULE)
             sweepStops.forEach(stop => {
                 let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
                 
-                // If the entire stop group fits cleanly inside the open vehicle, bundle them together
                 if (stop.passengers.length <= seatsAvailable) {
                     stop.passengers.forEach(p => {
                         p.assigned = true;
                         currentTaxi.passengers.push(p);
                     });
                 } else {
-                    // If adding them would split the group, finalize the current taxi and sweep into a fresh one
                     if (currentTaxi.passengers.length > 0) {
                         finalizedTaxis.push(currentTaxi);
                         currentTaxi = { passengers: [] };
@@ -520,16 +514,7 @@
                 finalizedTaxis.push(currentTaxi);
             }
 
-            // FILTER ASSIGNMENTS AGAINST THE MINIMUM EFFICIENCY CAP BOUNDARY (14 PASSENGER FLOOR)
-            finalizedTaxis = finalizedTaxis.filter(taxi => {
-                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    return true;
-                } else {
-                    taxi.passengers.forEach(p => p.assigned = false);
-                    return false;
-                }
-            });
-
+            // RIGID MIN_PASSENGER_FLOOR FILTER REMOVED TO PREVENT STRANDING NEIGHBORHOOD REMAINDERS
             finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
