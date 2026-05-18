@@ -258,7 +258,7 @@
     const MIN_PASSENGER_FLOOR = 14;
     const MAX_UNIQUE_STOPS_LIMIT = 8;
 
-    // MASTER SEQUENCE LIST
+    // IDEAL GEOGRAPHICAL MASTER ROUTE TIMELINE SWEEP SEQUENCE ORDER
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -266,7 +266,6 @@
         "Northriding square", "Randburg Oxford Engen", "Randburg Surrery Square", "BP Linden", "Roodepoort - Monash", "Bridgetown"
     ];
 
-    // CLEAN SYNTAX KEY-VALUE PAIR MATRIX MAPPING
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Arteria": "Parktown Route", "Education Campus": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
@@ -345,25 +344,6 @@
             }
         }
         return sequence;
-    }
-
-    function findPerfectSubset(stops, targetCapacity) {
-        for (let i = 1; i < (1 << stops.length); i++) {
-            let sum = 0;
-            let subset = [];
-            let uniqueStopsSet = new Set();
-            for (let j = 0; j < stops.length; j++) {
-                if (i & (1 << j)) {
-                    sum += stops[j].passengers.length;
-                    subset.push(stops[j]);
-                    uniqueStopsSet.add(stops[j].stopName);
-                }
-            }
-            if (sum === targetCapacity && uniqueStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT) {
-                return subset;
-            }
-        }
-        return null;
     }
 
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
@@ -462,8 +442,6 @@
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
-            let finalizedTaxis = [];
-
             let stopMap = {};
             workingPool.forEach(p => {
                 if (!stopMap[p.displayStop]) {
@@ -478,86 +456,71 @@
             });
             let allStopsList = Object.values(stopMap);
 
-            let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route", "JHB West & North Route"];
-            uniqueAreas.forEach(areaName => {
-                let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
-                let processingArea = true;
-                while (processingArea) {
-                    let unallocatedAreaStops = areaStops.filter(s => s.passengers.every(p => !p.assigned));
-                    let perfectSubset = findPerfectSubset(unallocatedAreaStops, TAXI_CAPACITY);
-                    if (perfectSubset) {
-                        let taxiPassengers = [];
-                        perfectSubset.forEach(stop => {
-                            stop.passengers.forEach(p => { p.assigned = true; taxiPassengers.push(p); });
-                        });
-                        finalizedTaxis.push({ passengers: taxiPassengers });
-                    } else {
-                        processingArea = false;
-                    }
+            // COMPILE ALL STOPS IN STRICT IDEAL CHRONOLOGICAL ROUTE TIMELINE ORDER
+            let orderedActiveStops = [];
+            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
+                let match = allStopsList.find(s => s.stopName === stopName);
+                if (match && match.passengers.length > 0) {
+                    orderedActiveStops.push(match);
                 }
             });
+            let unknownMatch = allStopsList.find(s => s.stopName === "Unknown");
+            if (unknownMatch && unknownMatch.passengers.length > 0) {
+                orderedActiveStops.push(unknownMatch);
+            }
 
-            let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
-            remainingStops.sort((a, b) => {
-                if (a.sourceArea !== b.sourceArea) {
-                    return uniqueAreas.indexOf(a.sourceArea) - uniqueAreas.indexOf(b.sourceArea);
-                }
-                return a.sequenceIndex - b.sequenceIndex;
-            });
+            let finalizedTaxis = [];
+            let currentTaxi = { passengers: [] };
+            let sweepStops = [];
 
-            remainingStops.forEach(stop => {
+            // STEP 1: CARVE OUT HIGH-VOLUME STOPS (ANCHORS) INTO PURE DIRECT RUNS FIRST
+            orderedActiveStops.forEach(stop => {
                 let unassignedRiders = stop.passengers.filter(p => !p.assigned);
-                if (unassignedRiders.length === 0) return;
-
-                let P = unassignedRiders.length;
                 
-                let openTaxis = finalizedTaxis.filter(t => {
-                    let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
-                    currentStopsSet.add(stop.stopName);
-                    return (TAXI_CAPACITY - t.passengers.length) >= P && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
-                });
-
-                let chosenTaxi = null;
-                if (openTaxis.length > 0) {
-                    let perfectFitTaxis = openTaxis.filter(t => (TAXI_CAPACITY - t.passengers.length) === P);
-                    if (perfectFitTaxis.length > 0) {
-                        chosenTaxi = selectBestTaxiByRules(perfectFitTaxis, stop.sequenceIndex);
-                    } else {
-                        chosenTaxi = selectBestTaxiByRules(openTaxis, stop.sequenceIndex);
-                    }
+                while (unassignedRiders.length >= TAXI_CAPACITY) {
+                    let fullTaxiPassengers = unassignedRiders.splice(0, TAXI_CAPACITY);
+                    fullTaxiPassengers.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: fullTaxiPassengers });
                 }
-
-                if (chosenTaxi) {
-                    unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
-                } else {
-                    while (unassignedRiders.length > 0) {
-                        let currentOpenTaxis = finalizedTaxis.filter(t => {
-                            let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
-                            currentStopsSet.add(stop.stopName);
-                            return (TAXI_CAPACITY - t.passengers.length) > 0 && currentStopsSet.size <= MAX_UNIQUE_STOPS_LIMIT;
-                        });
-
-                        let fitTaxi = currentOpenTaxis.find(t => (TAXI_CAPACITY - t.passengers.length) >= unassignedRiders.length);
-                        
-                        if (fitTaxi) {
-                            let chunk = unassignedRiders.splice(0, unassignedRiders.length);
-                            chunk.forEach(p => { p.assigned = true; fitTaxi.passengers.push(p); });
-                        } else if (currentOpenTaxis.length > 0) {
-                            let partialTaxi = currentOpenTaxis[0];
-                            let seatsAvailable = TAXI_CAPACITY - partialTaxi.passengers.length;
-                            let chunk = unassignedRiders.splice(0, seatsAvailable);
-                            chunk.forEach(p => { p.assigned = true; partialTaxi.passengers.push(p); });
-                        } else {
-                            let newTaxi = { passengers: [] };
-                            finalizedTaxis.push(newTaxi);
-                            let seatsToTake = Math.min(TAXI_CAPACITY, unassignedRiders.length);
-                            let chunk = unassignedRiders.splice(0, seatsToTake);
-                            chunk.forEach(p => { p.assigned = true; newTaxi.passengers.push(p); });
-                        }
-                    }
+                
+                if (unassignedRiders.length > 0) {
+                    sweepStops.push({
+                        stopName: stop.stopName,
+                        sourceArea: stop.sourceArea,
+                        passengers: unassignedRiders,
+                        sequenceIndex: stop.sequenceIndex
+                    });
                 }
             });
 
+            // STEP 2: REWRITTEN SEQUENTIAL LINEAR ROUTE SWEEP ENGINE (ANTI-SPLIT MECHANISM)
+            sweepStops.forEach(stop => {
+                let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
+                
+                // If the entire stop group fits cleanly inside the open vehicle, bundle them together
+                if (stop.passengers.length <= seatsAvailable) {
+                    stop.passengers.forEach(p => {
+                        p.assigned = true;
+                        currentTaxi.passengers.push(p);
+                    });
+                } else {
+                    // If adding them would split the group, finalize the current taxi and sweep into a fresh one
+                    if (currentTaxi.passengers.length > 0) {
+                        finalizedTaxis.push(currentTaxi);
+                        currentTaxi = { passengers: [] };
+                    }
+                    stop.passengers.forEach(p => {
+                        p.assigned = true;
+                        currentTaxi.passengers.push(p);
+                    });
+                }
+            });
+
+            if (currentTaxi.passengers.length > 0) {
+                finalizedTaxis.push(currentTaxi);
+            }
+
+            // FILTER ASSIGNMENTS AGAINST THE MINIMUM EFFICIENCY CAP BOUNDARY (14 PASSENGER FLOOR)
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -571,6 +534,7 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
+            // UI LOGISTICS MONITOR DISPLAY COMPILATION GENERATION
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -592,7 +556,6 @@
                 
                 let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
                 
-                // SAFE EVALUATION INTERCEPTION LOOP TO RENDER PASSENGER MISMATCH UNKNOWNS
                 if (uniqueStopsInTaxiSet.has("Unknown")) {
                     orderedSequenceForTaxi.push("Unknown");
                 }
@@ -626,7 +589,6 @@
                     });
                 });
 
-                // REFLECTING PRECISE HEADCOUNT ROW MATCHING
                 let actualRidersCount = passengerIndexCounter - 1;
 
                 vehicleBlockElement.innerHTML = `
