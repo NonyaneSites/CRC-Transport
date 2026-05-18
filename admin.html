@@ -256,9 +256,9 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8; // STRICT USER RULE
+    const MAX_UNIQUE_STOPS_LIMIT = 8;
 
-    // UPDATED ROUTE SELECTION MAPPED TO CHECKPOINTS
+    // MASTER SEQUENCE LIST
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -266,11 +266,12 @@
         "Northriding square", "Randburg Oxford Engen", "Randburg Surrery Square", "BP Linden", "Roodepoort - Monash", "Bridgetown"
     ];
 
+    // CLEAN SYNTAX KEY-VALUE PAIR MATRIX MAPPING
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Arteria": "Parktown Route", "Education Campus": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route", "Gate 7": "Braam Route",
-        "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route",
+        "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route",
         "Northriding square": "JHB West & North Route", "Randburg Oxford Engen": "JHB West & North Route", "Randburg Surrery Square": "JHB West & North Route", "BP Linden": "JHB West & North Route", "Roodepoort - Monash": "JHB West & North Route", "Bridgetown": "JHB West & North Route"
     };
 
@@ -333,7 +334,6 @@
         }
     }
 
-    // CONDITIONAL ROUTE MATRIX PLANNER
     function getCustomRouteSequence(taxiStopsList) {
         let sequence = [...MASTER_ROUTE_SEQUENCE];
         if (taxiStopsList.includes("Charlotte Maxeke") && taxiStopsList.includes("Education Campus") && taxiStopsList.includes("Arteria")) {
@@ -347,7 +347,6 @@
         return sequence;
     }
 
-    // Combinatorial subset optimization engine
     function findPerfectSubset(stops, targetCapacity) {
         for (let i = 1; i < (1 << stops.length); i++) {
             let sum = 0;
@@ -367,7 +366,6 @@
         return null;
     }
 
-    // Tie-breaker algorithm filtering by complexity matrix and proximity indexes
     function selectBestTaxiByRules(taxisList, currentStopIndex) {
         let minStopsCount = Math.min(...taxisList.map(t => {
             return new Set(t.passengers.map(p => p.displayStop)).size;
@@ -432,7 +430,6 @@
                 return;
             }
 
-            // TRANSLATION LAYER STRUCTURING SPECIFIC PICKUP LABELS TO CENTRAL HUB SEQUENCES
             let workingPool = deduplicatedRecords.map(r => {
                 let dbStopRaw = r.pickup_stop ? r.pickup_stop.trim().toLowerCase() : "";
                 
@@ -481,7 +478,6 @@
             });
             let allStopsList = Object.values(stopMap);
 
-            // PHASE 1: EXECUTE WHOLE REGIONAL MATCH COMBINATIONS
             let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route", "JHB West & North Route"];
             uniqueAreas.forEach(areaName => {
                 let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
@@ -501,7 +497,6 @@
                 }
             });
 
-            // PHASE 2: PACK REMAINING SPILLOVERS FULFILLING CAPACITY AND THE 8-STOP BOUNDS
             let remainingStops = allStopsList.filter(s => s.passengers.some(p => !p.assigned));
             remainingStops.sort((a, b) => {
                 if (a.sourceArea !== b.sourceArea) {
@@ -535,7 +530,6 @@
                 if (chosenTaxi) {
                     unassignedRiders.forEach(p => { p.assigned = true; chosenTaxi.passengers.push(p); });
                 } else {
-                    // TYPE-SAFE FALLBACK DISPATCH ENGINE
                     while (unassignedRiders.length > 0) {
                         let currentOpenTaxis = finalizedTaxis.filter(t => {
                             let currentStopsSet = new Set(t.passengers.map(p => p.displayStop));
@@ -564,7 +558,6 @@
                 }
             });
 
-            // PHASE 3: REMOVE MANIFESTS SHORT OF CAPACITIES (14 SEATS)
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
@@ -578,7 +571,6 @@
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // PHASE 4: UI GENERATION PIPELINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -589,9 +581,8 @@
                 let majorityArea = Object.keys(areaTallyMap).reduce((a, b) => areaTallyMap[a] > areaTallyMap[b] ? a : b);
 
                 let uniqueStopsInTaxiSet = new Set(taxi.passengers.map(p => p.displayStop));
-                let uniqueStopsInTaxiCount = uniqueStopsInTaxiSet.size;
-                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let cleanAreaLabelName = majorityArea.replace(" Route", "");
+                let uniqueAreasInTaxi = new Set(taxi.passengers.map(p => p.sourceArea));
                 let dynamicRouteHeaderTitle = uniqueAreasInTaxi.size > 1 
                     ? `${cleanAreaLabelName} (Mixed) Manifest` 
                     : `${majorityArea} Manifest`;
@@ -601,7 +592,7 @@
                 
                 let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
                 
-                // FIXED COUNT MISMATCH PASSENGER RENDERING APPASSION MATRIX PASS
+                // SAFE EVALUATION INTERCEPTION LOOP TO RENDER PASSENGER MISMATCH UNKNOWNS
                 if (uniqueStopsInTaxiSet.has("Unknown")) {
                     orderedSequenceForTaxi.push("Unknown");
                 }
@@ -635,12 +626,15 @@
                     });
                 });
 
+                // REFLECTING PRECISE HEADCOUNT ROW MATCHING
+                let actualRidersCount = passengerIndexCounter - 1;
+
                 vehicleBlockElement.innerHTML = `
                     <div class="vehicle-header-trigger" onclick="toggleTaxiView(${runningGlobalId})">
                         <div class="vehicle-title">
                             🚍 Taxi #${runningGlobalId} — ${dynamicRouteHeaderTitle} 
                             <span style="font-weight:normal; font-size:0.95rem; color:#475569;">
-                                (${taxi.passengers.length}/${TAXI_CAPACITY} seats • 📌 ${uniqueStopsInTaxiCount}/${MAX_UNIQUE_STOPS_LIMIT} stops)
+                                (${actualRidersCount}/${TAXI_CAPACITY} seats • 📌 ${uniqueStopsInTaxiSet.size}/${MAX_UNIQUE_STOPS_LIMIT} stops)
                             </span>
                         </div>
                         <div class="toggle-status-badge" id="taxi-badge-${runningGlobalId}">▼ Show List</div>
@@ -660,7 +654,6 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // PHASE 5: COMPILE UNASSIGNED PASSENGERS CARD CONTAINER
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -756,7 +749,6 @@
         }
     }
 
-    // INSTANT MASTER WIPE ENGINE FOR MANUAL CYCLE CLEARS
     async function triggerClearAllGate() {
         const accessPasswordInput = prompt("⚠️ WARNING: You are about to completely wipe the entire signup roster from the live cloud database.\n\nPlease enter the administrative password to confirm action:");
         if (accessPasswordInput === null) return; 
@@ -769,8 +761,6 @@
             try {
                 diagnosticBoxHeader.className = "status-good";
                 diagnosticBoxHeader.innerHTML = "⏳ Communicating wipe request with cloud servers...";
-
-                // Universally target all existing rows safely without encountering type cast compilation issues
                 const { error } = await churchDb.from('church_signups').delete().not('id', 'is', null);
                 
                 if (error) {
