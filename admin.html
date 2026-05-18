@@ -444,22 +444,18 @@
                             finalizedTaxis.push(currentTaxi);
                             currentTaxi = { passengers: [], stops: new Set() };
                             space = TAXI_CAPACITY;
-                            if (exceedsStops) continue; // Re-evaluate stop with empty taxi
+                            if (exceedsStops) continue; 
                         }
 
                         if (stopPass.length <= space) {
-                            // Fits perfectly: add and keep the group whole
                             let chunk = stopPass.splice(0, stopPass.length);
                             chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
                             currentTaxi.stops.add(stopName);
                         } else {
-                            // Does NOT fit perfectly
                             if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                                // Taxi is 14-16 people. Dispatch EARLY to preserve the next stop.
                                 finalizedTaxis.push(currentTaxi);
                                 currentTaxi = { passengers: [], stops: new Set() };
                             } else {
-                                // Taxi is under 14. We are forced to split the stop to make the taxi viable.
                                 let chunk = stopPass.splice(0, space);
                                 chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
                                 currentTaxi.stops.add(stopName);
@@ -471,17 +467,15 @@
                     }
                 });
 
-                // End of Area Sweep
                 if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    finalizedTaxis.push(currentTaxi); // Perfect viable taxi
+                    finalizedTaxis.push(currentTaxi); 
                 } else if (currentTaxi.passengers.length > 0) {
-                    // Taxi is under 14. Demote to remainders pool for area mixing.
                     currentTaxi.passengers.forEach(p => p.assigned = false);
                     remaindersPool.push(...currentTaxi.passengers);
                 }
             });
 
-            // PHASE 2: MIXED AREA REMAINDERS (Spillover pool to ensure nobody is left behind)
+            // PHASE 2: MIXED AREA REMAINDERS (Spillover pool)
             let mixedStopsMap = {};
             remaindersPool.forEach(p => {
                 if (!mixedStopsMap[p.displayStop]) mixedStopsMap[p.displayStop] = [];
@@ -526,14 +520,35 @@
                 }
             });
 
-            // PHASE 3: THE FINAL LIMBO RULE
-            // The absolute final mixed taxi is evaluated.
+            // PHASE 3: THE ZERO-LIMBO BACKFILL RULE
             if (mixedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                 finalizedTaxis.push(mixedTaxi);
             } else if (mixedTaxi.passengers.length > 0) {
-                // These specific passengers are not enough to fill a new taxi (< 14) and are too much for current taxis.
-                // Therefore, they are sent to Limbo exactly per your rules.
-                mixedTaxi.passengers.forEach(p => p.assigned = false);
+                
+                // BACKFILL: Instead of dropping to limbo, we physically force these final 
+                // passengers into the 'cracks' (empty seats) of the existing fleet.
+                let leftoverPassengers = mixedTaxi.passengers.splice(0, mixedTaxi.passengers.length);
+                
+                leftoverPassengers.forEach(p => {
+                    let bestTaxi = null;
+                    
+                    // PREFERENCE 1: Find a taxi with space that ALREADY stops at this location.
+                    bestTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY && t.stops.has(p.displayStop));
+                    
+                    // PREFERENCE 2: If none exists, find ANY taxi with space that hasn't hit the 8-stop limit.
+                    if (!bestTaxi) {
+                        bestTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY && t.stops.size < MAX_UNIQUE_STOPS_LIMIT);
+                    }
+
+                    if (bestTaxi) {
+                        p.assigned = true;
+                        bestTaxi.passengers.push(p);
+                        bestTaxi.stops.add(p.displayStop);
+                    } else {
+                        // The entire fleet is completely physically full. 
+                        p.assigned = false;
+                    }
+                });
             }
 
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
@@ -647,7 +662,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because they are not enough to fill a new taxi (under 14 people) and there is no space left in the current active taxis without splitting groups.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These passengers could not be assigned because the entire fleet is physically full or has hit the 8-stop capacity limit.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
