@@ -255,7 +255,6 @@
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
-    const MIN_PASSENGER_FLOOR = 14;
     const MAX_UNIQUE_STOPS_LIMIT = 8; 
 
     // GEOGRAPHICAL ROUTE MAP ORDER
@@ -263,7 +262,7 @@
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
         "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald",
-        "Northriding square", "Randburg Oxford Engen", "Randburg Surrery Square", "BP Linden", "Roodepoort - Monash", "Bridgetown"
+        "Northriding square", "Randburg Oxford Engen", "Randburg Surrery Square", "BP Linden", "Roodepoort - Monash", "Bridgetown", "Unknown"
     ];
 
     const AREA_MAPPING = {
@@ -271,7 +270,7 @@
         "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Arteria": "Parktown Route", "Education Campus": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route", "Gate 7": "Braam Route",
         "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route",
-        "Northriding square": "JHB West & North Route", "Randburg Oxford Engen": "JHB West & North Route", "Randburg Surrery Square": "JHB West & North Route", "BP Linden": "JHB West & North Route", "Roodepoort - Monash": "JHB West & North Route", "Bridgetown": "JHB West & North Route"
+        "Northriding square": "JHB West & North Route", "Randburg Oxford Engen": "JHB West & North Route", "Randburg Surrery Square": "JHB West & North Route", "BP Linden": "JHB West & North Route", "Roodepoort - Monash": "JHB West & North Route", "Bridgetown": "JHB West & North Route", "Unknown": "Unknown Area"
     };
 
     let churchDb = null;
@@ -414,108 +413,115 @@
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
+            let stopMap = {};
+            workingPool.forEach(p => {
+                if (!stopMap[p.displayStop]) {
+                    stopMap[p.displayStop] = {
+                        stopName: p.displayStop,
+                        sourceArea: p.sourceArea,
+                        passengers: [],
+                        sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop)
+                    };
+                }
+                stopMap[p.displayStop].passengers.push(p);
+            });
+            let allStopsList = Object.values(stopMap);
+
+            // HUB AND SPOKE LOGISTICS ENGINE
+            // Hubs act as liquid top-offs. Small groups are preserved whole. Limbo is mathematically eliminated.
+            let hubs = allStopsList.filter(s => s.passengers.length >= 12);
+            let regularStops = allStopsList.filter(s => s.passengers.length < 12);
+
+            // Sort geographically
+            regularStops.sort((a, b) => a.sequenceIndex - b.sequenceIndex);
+
             let finalizedTaxis = [];
+            let currentTaxi = { passengers: [], stops: new Set() };
 
-            // PHASE 1: FILL DIRECT ANCHORS (GROUPS OF EXACT 17 FROM A SINGLE Hub)
-            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
-                let stopPassengers = workingPool.filter(p => p.displayStop === stopName);
-                while (stopPassengers.length >= TAXI_CAPACITY) {
-                    let chunk = stopPassengers.splice(0, TAXI_CAPACITY);
-                    chunk.forEach(p => p.assigned = true);
-                    finalizedTaxis.push({ passengers: chunk });
-                }
-            });
+            // Sweep and Top-Off Logic
+            for (let i = 0; i < regularStops.length; i++) {
+                let stop = regularStops[i];
+                if (stop.passengers.length === 0) continue;
 
-            let unknownPassengers = workingPool.filter(p => p.displayStop === "Unknown");
-            while (unknownPassengers.length >= TAXI_CAPACITY) {
-                let chunk = unknownPassengers.splice(0, TAXI_CAPACITY);
-                chunk.forEach(p => p.assigned = true);
-                finalizedTaxis.push({ passengers: chunk });
-            }
+                let space = TAXI_CAPACITY - currentTaxi.passengers.length;
+                let addingStopExceedsLimit = !currentTaxi.stops.has(stop.stopName) && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
 
-            // PHASE 2: PREPARE REMAINING GROUPS
-            let remainingGroups = [];
-            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
-                let remaining = workingPool.filter(p => p.displayStop === stopName && !p.assigned);
-                if (remaining.length > 0) {
-                    remainingGroups.push({ stopName: stopName, passengers: remaining });
-                }
-            });
-            let remainingUnknown = workingPool.filter(p => p.displayStop === "Unknown" && !p.assigned);
-            if (remainingUnknown.length > 0) {
-                remainingGroups.push({ stopName: "Unknown", passengers: remainingUnknown });
-            }
-
-            // PHASE 3: GEOGRAPHIC CHUNKING ENGINE (ANTI-SPLIT & STOP MINIMIZATION)
-            while (remainingGroups.length > 0) {
-                let currentTaxi = { passengers: [] };
-                let currentStops = new Set();
-                let i = 0;
-
-                while (i < remainingGroups.length) {
-                    let group = remainingGroups[i];
-                    let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    let addsNewStop = !currentStops.has(group.stopName);
-                    let willExceedStops = addsNewStop && currentStops.size >= MAX_UNIQUE_STOPS_LIMIT;
-
-                    // Does the entire group fit cleanly without violating the 8-stop rule?
-                    if (group.passengers.length <= seatsAvailable && !willExceedStops) {
-                        group.passengers.forEach(p => { 
-                            p.assigned = true; 
-                            currentTaxi.passengers.push(p); 
+                // If adding this stop busts the stop limit OR exceeds capacity, finalize current taxi FIRST
+                if (stop.passengers.length > space || addingStopExceedsLimit) {
+                    
+                    // TOP OFF Phase: Grab needed seats from massive Hubs (Braam, Gate 7) to perfect the taxi
+                    let needed = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    if (needed > 0) {
+                        hubs.forEach(hub => {
+                            if (needed > 0 && hub.passengers.length > 0) {
+                                let canAdd = currentTaxi.stops.has(hub.stopName) || currentTaxi.stops.size < MAX_UNIQUE_STOPS_LIMIT;
+                                if (canAdd) {
+                                    let take = Math.min(needed, hub.passengers.length);
+                                    let chunk = hub.passengers.splice(0, take);
+                                    chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+                                    currentTaxi.stops.add(hub.stopName);
+                                    needed -= take;
+                                }
+                            }
                         });
-                        currentStops.add(group.stopName);
-                        remainingGroups.splice(i, 1); // Remove from list, DO NOT increment index 'i'
-                    } else {
-                        // The group does not fit perfectly, OR exceeds the stop limit.
-                        // CHECK: Is our taxi already sufficiently packed?
-                        if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                            // Yes. Finalize this taxi now. This prevents skipping ahead and minimizes stops.
-                            break; 
-                        } else {
-                            // No, it's under 14. We must skip this group and look ahead for a smaller one to fill seats.
-                            i++;
+                    }
+
+                    finalizedTaxis.push(currentTaxi);
+                    currentTaxi = { passengers: [], stops: new Set() };
+                }
+
+                // Now add the solid small stop into the fresh (or existing) taxi safely
+                stop.passengers.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+                currentTaxi.stops.add(stop.stopName);
+            }
+
+            // Top off the very last geographic sweep taxi if space is left
+            let needed = TAXI_CAPACITY - currentTaxi.passengers.length;
+            if (needed > 0 && currentTaxi.passengers.length > 0) {
+                hubs.forEach(hub => {
+                    if (needed > 0 && hub.passengers.length > 0) {
+                        let canAdd = currentTaxi.stops.has(hub.stopName) || currentTaxi.stops.size < MAX_UNIQUE_STOPS_LIMIT;
+                        if (canAdd) {
+                            let take = Math.min(needed, hub.passengers.length);
+                            let chunk = hub.passengers.splice(0, take);
+                            chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+                            currentTaxi.stops.add(hub.stopName);
+                            needed -= take;
                         }
                     }
-                }
-
-                // EMERGENCY SPLIT PROTOCOL (Absolute Last Resort)
-                // If we swept the whole route, skipped the big groups, and the taxi STILL hasn't reached 14...
-                if (currentTaxi.passengers.length < MIN_PASSENGER_FLOOR && remainingGroups.length > 0) {
-                    // Find the safest group to split (preferably a stop we already visited)
-                    let targetIndex = remainingGroups.findIndex(g => currentStops.has(g.stopName) || currentStops.size < MAX_UNIQUE_STOPS_LIMIT);
-                    if (targetIndex === -1) targetIndex = 0; // Fallback to whatever is available
-
-                    let targetGroup = remainingGroups[targetIndex];
-                    let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    
-                    let amountToTake = Math.min(seatsAvailable, targetGroup.passengers.length);
-                    let splitChunk = targetGroup.passengers.splice(0, amountToTake);
-                    
-                    splitChunk.forEach(p => { 
-                        p.assigned = true; 
-                        currentTaxi.passengers.push(p); 
-                    });
-                    currentStops.add(targetGroup.stopName);
-                    
-                    if (targetGroup.passengers.length === 0) {
-                        remainingGroups.splice(targetIndex, 1);
-                    }
-                }
-
+                });
+            }
+            if (currentTaxi.passengers.length > 0) {
                 finalizedTaxis.push(currentTaxi);
             }
 
-            // PHASE 4: FILTER UNDERSIZED TAXIS (End of night leftovers) TO LIMBO
-            finalizedTaxis = finalizedTaxis.filter(taxi => {
-                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    return true;
-                } else {
-                    taxi.passengers.forEach(p => p.assigned = false);
-                    return false;
+            // Dump remaining massive Hub people into pure 17-person dedicated taxis
+            hubs.forEach(hub => {
+                while (hub.passengers.length > 0) {
+                    let take = Math.min(TAXI_CAPACITY, hub.passengers.length);
+                    let chunk = hub.passengers.splice(0, take);
+                    let taxi = { passengers: [], stops: new Set([hub.stopName]) };
+                    chunk.forEach(p => { p.assigned = true; taxi.passengers.push(p); });
+                    finalizedTaxis.push(taxi);
                 }
             });
 
+            // Clean-Up Merge: Aggressively combine any remaining sparse tail-end taxis to save driver trips
+            for (let i = 0; i < finalizedTaxis.length; i++) {
+                for (let j = i + 1; j < finalizedTaxis.length; j++) {
+                    let t1 = finalizedTaxis[i];
+                    let t2 = finalizedTaxis[j];
+                    let combinedStops = new Set([...t1.stops, ...t2.stops]);
+                    if (t1.passengers.length + t2.passengers.length <= TAXI_CAPACITY && combinedStops.size <= MAX_UNIQUE_STOPS_LIMIT) {
+                        t2.passengers.forEach(p => t1.passengers.push(p));
+                        combinedStops.forEach(s => t1.stops.add(s));
+                        finalizedTaxis.splice(j, 1);
+                        j--; 
+                    }
+                }
+            }
+
+            // ZERO LIMBO RULE: Everyone is mapped. The strict deletion filter has been intentionally removed!
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
@@ -541,10 +547,6 @@
                 
                 let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
                 
-                if (uniqueStopsInTaxiSet.has("Unknown")) {
-                    orderedSequenceForTaxi.push("Unknown");
-                }
-
                 let routePlanStrings = [];
                 orderedSequenceForTaxi.forEach(sName => {
                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
@@ -601,6 +603,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
+            // This Limbo section will now only catch critical unmapped data errors, not size-based exclusions
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -627,7 +630,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because their headcount falls below the minimum required efficiency bounds (14 passengers) or cannot fit existing taxis without violating the maximum 8 stops constraint limit.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops could not be processed due to missing location data or mapping failures.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
