@@ -256,9 +256,9 @@
     const ADMIN_PASSWORD = "Church2026"; 
     const TAXI_CAPACITY = 17;
     const MIN_PASSENGER_FLOOR = 14;
-    const MAX_UNIQUE_STOPS_LIMIT = 8; 
+    const MAX_UNIQUE_STOPS_LIMIT = 8;
 
-    // IDEAL GEOGRAPHICAL MASTER ROUTE TIMELINE SWEEP SEQUENCE ORDER
+    // GEOGRAPHICAL ROUTE MAP ORDER
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
@@ -442,84 +442,79 @@
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
-            let stopMap = {};
-            workingPool.forEach(p => {
-                if (!stopMap[p.displayStop]) {
-                    stopMap[p.displayStop] = {
-                        stopName: p.displayStop,
-                        sourceArea: p.sourceArea,
-                        passengers: [],
-                        sequenceIndex: MASTER_ROUTE_SEQUENCE.indexOf(p.displayStop)
-                    };
-                }
-                stopMap[p.displayStop].passengers.push(p);
-            });
-            let allStopsList = Object.values(stopMap);
-
-            // COMPILE ALL STOPS IN STRICT IDEAL CHRONOLOGICAL ROUTE TIMELINE ORDER (EXCLUDES UNKNOWN)
-            let orderedActiveStops = [];
-            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
-                let match = allStopsList.find(s => s.stopName === stopName);
-                if (match && match.passengers.length > 0) {
-                    orderedActiveStops.push(match);
-                }
-            });
-
             let finalizedTaxis = [];
-            let currentTaxi = { passengers: [] };
-            let sweepStops = [];
 
-            // STEP 1: CARVE OUT HIGH-VOLUME STOPS (ANCHORS) INTO PURE DIRECT RUNS FIRST
-            orderedActiveStops.forEach(stop => {
-                let unassignedRiders = stop.passengers.filter(p => !p.assigned);
-                
-                while (unassignedRiders.length >= TAXI_CAPACITY) {
-                    let fullTaxiPassengers = unassignedRiders.splice(0, TAXI_CAPACITY);
-                    fullTaxiPassengers.forEach(p => p.assigned = true);
-                    finalizedTaxis.push({ passengers: fullTaxiPassengers });
-                }
-                
-                if (unassignedRiders.length > 0) {
-                    sweepStops.push({
-                        stopName: stop.stopName,
-                        sourceArea: stop.sourceArea,
-                        passengers: unassignedRiders,
-                        sequenceIndex: stop.sequenceIndex
-                    });
+            // PHASE 1: FILL DIRECT ANCHORS (GROUPS OF EXACT 17 FROM A SINGLE Hub)
+            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
+                let stopPassengers = workingPool.filter(p => p.displayStop === stopName);
+                while (stopPassengers.length >= TAXI_CAPACITY) {
+                    let chunk = stopPassengers.splice(0, TAXI_CAPACITY);
+                    chunk.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: chunk });
                 }
             });
 
-            // STEP 2: SEQUENTIAL LINEAR ROUTE SWEEP ENGINE (ANTI-SPLIT LOGISTICS RULE)
-            sweepStops.forEach(stop => {
-                let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
-                
-                if (stop.passengers.length <= seatsAvailable) {
-                    stop.passengers.forEach(p => {
-                        p.assigned = true;
-                        currentTaxi.passengers.push(p);
-                    });
-                } else {
-                    if (currentTaxi.passengers.length > 0) {
-                        finalizedTaxis.push(currentTaxi);
-                        currentTaxi = { passengers: [] };
-                    }
-                    stop.passengers.forEach(p => {
-                        p.assigned = true;
-                        currentTaxi.passengers.push(p);
-                    });
-                }
-            });
-
-            if (currentTaxi.passengers.length > 0) {
-                finalizedTaxis.push(currentTaxi);
+            let unknownPassengers = workingPool.filter(p => p.displayStop === "Unknown");
+            while (unknownPassengers.length >= TAXI_CAPACITY) {
+                let chunk = unknownPassengers.splice(0, TAXI_CAPACITY);
+                chunk.forEach(p => p.assigned = true);
+                finalizedTaxis.push({ passengers: chunk });
             }
 
-            // RIGID MIN_PASSENGER_FLOOR FILTER REMOVED TO PREVENT STRANDING NEIGHBORHOOD REMAINDERS
-            finalizedTaxis.forEach(t => t.passengers.forEach(p => p.assigned = true));
+            // PHASE 2: POOL UNASSIGNED LEFTOVERS IN STRICT GEOGRAPHICAL ROUTE TIMELINE SWEEP ORDER
+            let leftoverPassengersPool = [];
+            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
+                let remaining = workingPool.filter(p => p.displayStop === stopName && !p.assigned);
+                leftoverPassengersPool.push(...remaining);
+            });
+            let remainingUnknown = workingPool.filter(p => p.displayStop === "Unknown" && !p.assigned);
+            leftoverPassengersPool.push(...remainingUnknown);
+
+            // PHASE 3: BALANCED CAPACITY SIZE ALLOCATION ENGINE (STRICT 14 MINIMUM FLOOR CHECK)
+            let T = leftoverPassengersPool.length;
+            let targetSizes = [];
+            let remainingCount = T;
+
+            while (remainingCount >= TAXI_CAPACITY) {
+                targetSizes.push(TAXI_CAPACITY);
+                remainingCount -= TAXI_CAPACITY;
+            }
+
+            if (remainingCount > 0) {
+                if (remainingCount >= MIN_PASSENGER_FLOOR) {
+                    targetSizes.push(remainingCount);
+                } else {
+                    // Back-balance: borrow empty slots from preceding vehicles to lift the trailing remainder up to 14
+                    let need = MIN_PASSENGER_FLOOR - remainingCount;
+                    let maxBorrowablePerCar = TAXI_CAPACITY - MIN_PASSENGER_FLOOR; // 17 - 14 = 3
+                    let totalAvailableToBorrow = targetSizes.length * maxBorrowablePerCar;
+
+                    if (need <= totalAvailableToBorrow) {
+                        for (let i = targetSizes.length - 1; i >= 0 && need > 0; i--) {
+                            let borrowAmount = Math.min(maxBorrowablePerCar, need);
+                            targetSizes[i] -= borrowAmount;
+                            need -= borrowAmount;
+                        }
+                        targetSizes.push(MIN_PASSENGER_FLOOR);
+                    } else {
+                        // If it's mathematically impossible to make a valid taxi, leave the remainder for Limbo box
+                    }
+                }
+            }
+
+            // PHASE 4: EXECUTE SEQUENTIAL ASSIGNMENTS TO VEHICLE MANIFESTS
+            let poolIndex = 0;
+            targetSizes.forEach(size => {
+                let chunk = leftoverPassengersPool.slice(poolIndex, poolIndex + size);
+                chunk.forEach(p => p.assigned = true);
+                finalizedTaxis.push({ passengers: chunk });
+                poolIndex += size;
+            });
+
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
-            // UI LOGISTICS MONITOR DISPLAY COMPILATION GENERATION
+            // PHASE 5: UI MANIFEST INTERFACE GENERATION PIPELINE
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
