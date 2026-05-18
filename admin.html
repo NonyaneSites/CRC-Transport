@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transport Administration Console</title>
     
-    <!-- EMBEDDED HIGH-RESOLUTION CONSOLE FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚖</text></svg>">
     
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -216,13 +214,11 @@
 
 <div class="container">
 
-    <!-- DATABASE MONITOR SYNC STATUS -->
     <div class="diagnostic-box">
         <strong>⚙️ Admin Database Diagnostic Monitor:</strong>
         <div id="diagnosticStatus" class="status-good">Connecting...</div>
     </div>
 
-    <!-- MAIN ACTIVE ROSTERS PANEL -->
     <div class="card">
         <h2>🚖 Sunday Compiled Taxi Rosters</h2>
         <div class="date-badge">Rosters For: <span class="targetSundayDate"></span></div>
@@ -235,12 +231,10 @@
         <div id="manifestContainer" style="margin-top: 20px;"></div>
     </div>
 
-    <!-- UNASSIGNED LIMBO ROW LIST HOLDER AT SCREEN BOTTOM -->
     <div id="limboSectionContainer"></div>
 
 </div>
 
-<!-- SECURITY MODAL DIALOG CONTAINER PORTAL -->
 <div id="customSecurityModal" class="modal-overlay">
     <div class="modal-card">
         <h3 style="margin-top:0; color:#0f172a;">🔒 Security Verification</h3>
@@ -268,14 +262,16 @@
     const MASTER_ROUTE_SEQUENCE = [
         "Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2",
         "Braam", "Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Gate 7",
-        "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"
+        "Yale", "Stanley Avenue", "UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald",
+        "Northriding square", "Randburg Oxford Engen", "Randburg Surrery Square", "BP Linden", "Roodepoort - Monash", "Bridgetown"
     ];
 
     const AREA_MAPPING = {
         "Ghandi Square": "CBD Route", "Maboneng": "CBD Route", "Urban Circle": "CBD Route", "DFC Bus Stop": "CBD Route", "The Fields": "CBD Route", "Saratoga": "CBD Route", "Gateway": "CBD Route", "Focus 1": "CBD Route", "Focus 2": "CBD Route",
-        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Arteria": "Parktown Route", "Education Campus": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
+        "Campus Central on Empire": "Parktown Route", "Argyle": "Parktown Route", "Junction": "Parktown Route", "Arteria": "Parktown Route", "Education Campus": "Parktown Route", "Charlotte Maxeke": "Parktown Route", "EOH": "Parktown Route", "Knockando", "Knockando": "Parktown Route", "Yale": "Parktown Route", "Stanley Avenue": "Parktown Route",
         "Braam": "Braam Route", "Gate 7": "Braam Route",
-        "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route"
+        "UJ Bunting": "Auckland Park Route", "Laborie": "Auckland Park Route", "Richmond": "Auckland Park Route", "Gate 2": "Auckland Park Route", "Gate 4": "Auckland Park Route", "Westdene Engen": "Auckland Park Route", "APK McDonald": "Auckland Park Route",
+        "Northriding square": "JHB West & North Route", "Randburg Oxford Engen": "JHB West & North Route", "Randburg Surrery Square": "JHB West & North Route", "BP Linden": "JHB West & North Route", "Roodepoort - Monash": "JHB West & North Route", "Bridgetown": "JHB West & North Route"
     };
 
     let churchDb = null;
@@ -486,7 +482,7 @@
             let allStopsList = Object.values(stopMap);
 
             // PHASE 1: EXECUTE WHOLE REGIONAL MATCH COMBINATIONS
-            let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route"];
+            let uniqueAreas = ["CBD Route", "Braam Route", "Parktown Route", "Auckland Park Route", "JHB West & North Route"];
             uniqueAreas.forEach(areaName => {
                 let areaStops = allStopsList.filter(s => s.sourceArea === areaName && s.passengers.length > 0);
                 let processingArea = true;
