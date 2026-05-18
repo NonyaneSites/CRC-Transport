@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Sunday Transport Portal</title>
     
-    <!-- EMBEDDED HIGH-RESOLUTION APPLICATION FAVICON ICON -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛪</text></svg>">
     
-    <!-- Include Supabase Core Cloud Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -103,7 +101,6 @@
 
 <div class="container">
 
-    <!-- SCREEN 1: SIGN-UP FORM -->
     <div id="bookingScreen" class="card">
         <h2>Sunday Transport Sign-Up</h2>
         <div class="date-badge">📅 Booking For: <span class="targetSundayDate">Loading...</span></div>
@@ -146,6 +143,7 @@
                     <option value="Parktown">Parktown</option>
                     <option value="Braam">Braam</option>
                     <option value="Auckland Park">Auckland Park</option>
+                    <option value="JHB West & North">JHB West & North</option>
                 </select>
             </div>
 
@@ -160,7 +158,6 @@
         </form>
     </div>
 
-    <!-- SCREEN 2: VISUAL CONFIRMATION SCREEN -->
     <div id="confirmationScreen" class="card">
         <div class="success-banner">
             🎉 SEAT RESERVED SUCCESSFULLY!<br>
@@ -196,7 +193,8 @@
         "CBD": ["Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
         "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
         "Braam": ["56 Jorissen", "Amani", "Amic Deck", "Apex", "Student Digzz", "YMCA", "Gate 7"],
-        "Auckland Park": ["UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"]
+        "Auckland Park": ["UJ Bunting", "Laborie", "Richmond", "Gate 2", "Gate 4", "Westdene Engen", "APK McDonald"],
+        "JHB West & North": ["Northriding square", "Randburg Oxford Engen", "Randburg Surrery Square", "BP Linden", "Roodepoort - Monash", "Bridgetown"]
     };
 
     function updateStopsDropdown() {
