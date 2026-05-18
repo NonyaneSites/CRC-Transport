@@ -411,145 +411,146 @@
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
+            // INITIALIZE MASTER PIPELINE STRUCTURES
+            let allStops = [];
+            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
+                let passengersAtStop = workingPool.filter(p => p.displayStop === stopName);
+                allStops.push({
+                    stopName: stopName,
+                    area: AREA_MAPPING[stopName] || "Unknown Area",
+                    passengers: passengersAtStop
+                });
+            });
+
             let finalizedTaxis = [];
-            let remaindersPool = [];
 
-            // PHASE 1: STRICT AREA SEGREGATION (Process one geographic route at a time)
-            let uniqueAreas = [...new Set(workingPool.map(p => p.sourceArea))];
+            // PIPELINE STEP 1: DEDICATED BLOCK ALLOCATION (Stop has >= 16 or 17 people)
+            allStops.forEach(stop => {
+                while (stop.passengers.length >= TAXI_CAPACITY) {
+                    let chunk = stop.passengers.splice(0, TAXI_CAPACITY);
+                    chunk.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: chunk, stops: new Set([stop.stopName]) });
+                }
+                if (stop.passengers.length >= (TAXI_CAPACITY - 1)) {
+                    let chunk = stop.passengers.splice(0, stop.passengers.length);
+                    chunk.forEach(p => p.assigned = true);
+                    finalizedTaxis.push({ passengers: chunk, stops: new Set([stop.stopName]) });
+                }
+            });
 
+            // PIPELINE STEP 2: SEQUENTIAL GEOGRAPHIC FILLING BY AREA
+            let uniqueAreas = [...new Set(MASTER_ROUTE_SEQUENCE.map(stopName => AREA_MAPPING[stopName]))].filter(Boolean);
+            
             uniqueAreas.forEach(area => {
-                let areaPassengers = workingPool.filter(p => p.sourceArea === area && !p.assigned);
-                
-                let areaStopsMap = {};
-                areaPassengers.forEach(p => {
-                    if (!areaStopsMap[p.displayStop]) areaStopsMap[p.displayStop] = [];
-                    areaStopsMap[p.displayStop].push(p);
-                });
-                
-                let sortedStopNames = Object.keys(areaStopsMap).sort((a, b) => {
-                    return MASTER_ROUTE_SEQUENCE.indexOf(a) - MASTER_ROUTE_SEQUENCE.indexOf(b);
-                });
+                while (true) {
+                    let areaStops = allStops.filter(s => s.area === area && s.passengers.length > 0);
+                    if (areaStops.length === 0) break;
 
-                let currentTaxi = { passengers: [], stops: new Set() };
+                    let totalRemainingInArea = 0;
+                    areaStops.forEach(s => totalRemainingInArea += s.passengers.length);
 
-                sortedStopNames.forEach(stopName => {
-                    let stopPass = areaStopsMap[stopName];
+                    // If total remaining passengers in area cannot fill a taxi to minimum viability, bypass step 2
+                    if (totalRemainingInArea < MIN_PASSENGER_FLOOR) {
+                        break;
+                    }
+
+                    let taxi = { passengers: [], stops: new Set() };
                     
-                    while (stopPass.length > 0) {
-                        let space = TAXI_CAPACITY - currentTaxi.passengers.length;
-                        let addsNewStop = !currentTaxi.stops.has(stopName);
-                        let exceedsStops = addsNewStop && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
+                    for (let stop of areaStops) {
+                        let space = TAXI_CAPACITY - taxi.passengers.length;
+                        let addsNewStop = !taxi.stops.has(stop.stopName);
+                        let exceedsStops = addsNewStop && taxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
 
-                        if (space === 0 || exceedsStops) {
-                            finalizedTaxis.push(currentTaxi);
-                            currentTaxi = { passengers: [], stops: new Set() };
-                            space = TAXI_CAPACITY;
-                            if (exceedsStops) continue; 
+                        if (stop.passengers.length <= space && !exceedsStops) {
+                            let chunk = stop.passengers.splice(0, stop.passengers.length);
+                            chunk.forEach(p => { p.assigned = true; taxi.passengers.push(p); });
+                            taxi.stops.add(stop.stopName);
                         }
-
-                        if (stopPass.length <= space) {
-                            let chunk = stopPass.splice(0, stopPass.length);
-                            chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                            currentTaxi.stops.add(stopName);
-                        } else {
-                            if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                                finalizedTaxis.push(currentTaxi);
-                                currentTaxi = { passengers: [], stops: new Set() };
-                            } else {
-                                let chunk = stopPass.splice(0, space);
-                                chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                                currentTaxi.stops.add(stopName);
-                                
-                                finalizedTaxis.push(currentTaxi);
-                                currentTaxi = { passengers: [], stops: new Set() };
-                            }
-                        }
-                    }
-                });
-
-                if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                    finalizedTaxis.push(currentTaxi); 
-                } else if (currentTaxi.passengers.length > 0) {
-                    currentTaxi.passengers.forEach(p => p.assigned = false);
-                    remaindersPool.push(...currentTaxi.passengers);
-                }
-            });
-
-            // PHASE 2: MIXED AREA REMAINDERS (Spillover pool)
-            let mixedStopsMap = {};
-            remaindersPool.forEach(p => {
-                if (!mixedStopsMap[p.displayStop]) mixedStopsMap[p.displayStop] = [];
-                mixedStopsMap[p.displayStop].push(p);
-            });
-            let sortedMixedStopNames = Object.keys(mixedStopsMap).sort((a, b) => {
-                return MASTER_ROUTE_SEQUENCE.indexOf(a) - MASTER_ROUTE_SEQUENCE.indexOf(b);
-            });
-
-            let mixedTaxi = { passengers: [], stops: new Set() };
-            sortedMixedStopNames.forEach(stopName => {
-                let stopPass = mixedStopsMap[stopName];
-                
-                while (stopPass.length > 0) {
-                    let space = TAXI_CAPACITY - mixedTaxi.passengers.length;
-                    let addsNewStop = !mixedTaxi.stops.has(stopName);
-                    let exceedsStops = addsNewStop && mixedTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
-
-                    if (space === 0 || exceedsStops) {
-                        finalizedTaxis.push(mixedTaxi);
-                        mixedTaxi = { passengers: [], stops: new Set() };
-                        space = TAXI_CAPACITY;
-                        if (exceedsStops) continue;
+                        if (taxi.passengers.length === TAXI_CAPACITY) break;
                     }
 
-                    if (stopPass.length <= space) {
-                        let chunk = stopPass.splice(0, stopPass.length);
-                        chunk.forEach(p => { p.assigned = true; mixedTaxi.passengers.push(p); });
-                        mixedTaxi.stops.add(stopName);
+                    if (taxi.passengers.length > 0) {
+                        finalizedTaxis.push(taxi);
                     } else {
-                        if (mixedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                            finalizedTaxis.push(mixedTaxi);
-                            mixedTaxi = { passengers: [], stops: new Set() };
-                        } else {
-                            let chunk = stopPass.splice(0, space);
-                            chunk.forEach(p => { p.assigned = true; mixedTaxi.passengers.push(p); });
-                            mixedTaxi.stops.add(stopName);
-                            finalizedTaxis.push(mixedTaxi);
-                            mixedTaxi = { passengers: [], stops: new Set() };
-                        }
+                        break;
                     }
                 }
             });
 
-            // PHASE 3: THE ZERO-LIMBO BACKFILL RULE
-            if (mixedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                finalizedTaxis.push(mixedTaxi);
-            } else if (mixedTaxi.passengers.length > 0) {
-                
-                // BACKFILL: Instead of dropping to limbo, we physically force these final 
-                // passengers into the 'cracks' (empty seats) of the existing fleet.
-                let leftoverPassengers = mixedTaxi.passengers.splice(0, mixedTaxi.passengers.length);
-                
-                leftoverPassengers.forEach(p => {
-                    let bestTaxi = null;
-                    
-                    // PREFERENCE 1: Find a taxi with space that ALREADY stops at this location.
-                    bestTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY && t.stops.has(p.displayStop));
-                    
-                    // PREFERENCE 2: If none exists, find ANY taxi with space that hasn't hit the 8-stop limit.
-                    if (!bestTaxi) {
-                        bestTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY && t.stops.size < MAX_UNIQUE_STOPS_LIMIT);
-                    }
+            // PIPELINE STEP 3: FIT LEFTOVER WHOLE STOPS INTO EMPTY SEATS (WITHOUT SPLITTING)
+            let leftoverStops = allStops.filter(s => s.passengers.length > 0);
+            leftoverStops.forEach(stop => {
+                let bestTaxi = finalizedTaxis.find(t => {
+                    let space = TAXI_CAPACITY - t.passengers.length;
+                    let addsNewStop = !t.stops.has(stop.stopName);
+                    let checkStopLimit = addsNewStop ? (t.stops.size < MAX_UNIQUE_STOPS_LIMIT) : true;
+                    return stop.passengers.length <= space && checkStopLimit;
+                });
 
-                    if (bestTaxi) {
-                        p.assigned = true;
-                        bestTaxi.passengers.push(p);
-                        bestTaxi.stops.add(p.displayStop);
-                    } else {
-                        // The entire fleet is completely physically full. 
+                if (bestTaxi) {
+                    let chunk = stop.passengers.splice(0, stop.passengers.length);
+                    chunk.forEach(p => { p.assigned = true; bestTaxi.passengers.push(p); });
+                    bestTaxi.stops.add(stop.stopName);
+                }
+            });
+
+            // PIPELINE STEP 4: MIX LEFTOVER STOPS ACROSS DIFFERENT AREAS
+            while (true) {
+                let remainingMixedStops = allStops.filter(s => s.passengers.length > 0);
+                if (remainingMixedStops.length === 0) break;
+
+                let taxi = { passengers: [], stops: new Set() };
+                for (let stop of remainingMixedStops) {
+                    let space = TAXI_CAPACITY - taxi.passengers.length;
+                    let addsNewStop = !taxi.stops.has(stop.stopName);
+                    let checkStopLimit = addsNewStop ? (taxi.stops.size < MAX_UNIQUE_STOPS_LIMIT) : true;
+
+                    if (stop.passengers.length <= space && checkStopLimit) {
+                        let chunk = stop.passengers.splice(0, stop.passengers.length);
+                        chunk.forEach(p => { p.assigned = true; taxi.passengers.push(p); });
+                        taxi.stops.add(stop.stopName);
+                    }
+                    if (taxi.passengers.length === TAXI_CAPACITY) break;
+                }
+
+                if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    finalizedTaxis.push(taxi);
+                } else {
+                    // Rollback assignment to let Step 5 & 6 process them for emergency splits
+                    taxi.passengers.forEach(p => {
                         p.assigned = false;
-                    }
-                });
+                        let originalStop = allStops.find(s => s.stopName === p.displayStop);
+                        originalStop.passengers.push(p);
+                    });
+                    break; 
+                }
             }
+
+            // PIPELINE STEP 5 & 6: LAST RESORT SLOT SPLITTING BOUNDED TO Open Seats
+            let remainingLimboStops = allStops.filter(s => s.passengers.length > 0);
+            remainingLimboStops.forEach(stop => {
+                while (stop.passengers.length > 0) {
+                    // Look for existing taxi servicing stop with empty seats first
+                    let targetTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY && t.stops.has(stop.stopName));
+                    
+                    // Fallback to any vehicle with empty seats under stop threshold limit
+                    if (!targetTaxi) {
+                        targetTaxi = finalizedTaxis.find(t => t.passengers.length < TAXI_CAPACITY && t.stops.size < MAX_UNIQUE_STOPS_LIMIT);
+                    }
+
+                    if (targetTaxi) {
+                        let space = TAXI_CAPACITY - targetTaxi.passengers.length;
+                        let amountToTake = Math.min(space, stop.passengers.length);
+                        let chunk = stop.passengers.splice(0, amountToTake);
+                        
+                        chunk.forEach(p => { p.assigned = true; targetTaxi.passengers.push(p); });
+                        targetTaxi.stops.add(stop.stopName);
+                    } else {
+                        // Entire fleet open seats are filled. Leftovers remain inside official Limbo pool state.
+                        break;
+                    }
+                }
+            });
 
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
@@ -662,7 +663,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These passengers could not be assigned because the entire fleet is physically full or has hit the 8-stop capacity limit.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These passengers cannot be assigned because the entire fleet has reached max physical capacity or hit the 8-stop limit bounds.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
