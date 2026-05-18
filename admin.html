@@ -399,7 +399,7 @@
                 }
 
                 let displayStop = "Unknown";
-                let mappedArea = "Unknown Route";
+                let mappedArea = "Unknown Area";
 
                 for (let i = 0; i < MASTER_ROUTE_SEQUENCE.length; i++) {
                     if (MASTER_ROUTE_SEQUENCE[i].toLowerCase() === dbStopRaw) {
@@ -411,69 +411,129 @@
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
-            // PHASE 1: PREPARE GEOGRAPHIC GROUPS
-            let geoGroups = [];
-            MASTER_ROUTE_SEQUENCE.forEach(stopName => {
-                let passengersAtStop = workingPool.filter(r => r.displayStop === stopName && !r.assigned);
-                if (passengersAtStop.length > 0) {
-                    geoGroups.push({ name: stopName, passengers: passengersAtStop });
+            let finalizedTaxis = [];
+            let remaindersPool = [];
+
+            // PHASE 1: STRICT AREA SEGREGATION (Process one geographic route at a time)
+            let uniqueAreas = [...new Set(workingPool.map(p => p.sourceArea))];
+
+            uniqueAreas.forEach(area => {
+                let areaPassengers = workingPool.filter(p => p.sourceArea === area && !p.assigned);
+                
+                let areaStopsMap = {};
+                areaPassengers.forEach(p => {
+                    if (!areaStopsMap[p.displayStop]) areaStopsMap[p.displayStop] = [];
+                    areaStopsMap[p.displayStop].push(p);
+                });
+                
+                let sortedStopNames = Object.keys(areaStopsMap).sort((a, b) => {
+                    return MASTER_ROUTE_SEQUENCE.indexOf(a) - MASTER_ROUTE_SEQUENCE.indexOf(b);
+                });
+
+                let currentTaxi = { passengers: [], stops: new Set() };
+
+                sortedStopNames.forEach(stopName => {
+                    let stopPass = areaStopsMap[stopName];
+                    
+                    while (stopPass.length > 0) {
+                        let space = TAXI_CAPACITY - currentTaxi.passengers.length;
+                        let addsNewStop = !currentTaxi.stops.has(stopName);
+                        let exceedsStops = addsNewStop && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
+
+                        if (space === 0 || exceedsStops) {
+                            finalizedTaxis.push(currentTaxi);
+                            currentTaxi = { passengers: [], stops: new Set() };
+                            space = TAXI_CAPACITY;
+                            if (exceedsStops) continue; // Re-evaluate stop with empty taxi
+                        }
+
+                        if (stopPass.length <= space) {
+                            // Fits perfectly: add and keep the group whole
+                            let chunk = stopPass.splice(0, stopPass.length);
+                            chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+                            currentTaxi.stops.add(stopName);
+                        } else {
+                            // Does NOT fit perfectly
+                            if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                                // Taxi is 14-16 people. Dispatch EARLY to preserve the next stop.
+                                finalizedTaxis.push(currentTaxi);
+                                currentTaxi = { passengers: [], stops: new Set() };
+                            } else {
+                                // Taxi is under 14. We are forced to split the stop to make the taxi viable.
+                                let chunk = stopPass.splice(0, space);
+                                chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+                                currentTaxi.stops.add(stopName);
+                                
+                                finalizedTaxis.push(currentTaxi);
+                                currentTaxi = { passengers: [], stops: new Set() };
+                            }
+                        }
+                    }
+                });
+
+                // End of Area Sweep
+                if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                    finalizedTaxis.push(currentTaxi); // Perfect viable taxi
+                } else if (currentTaxi.passengers.length > 0) {
+                    // Taxi is under 14. Demote to remainders pool for area mixing.
+                    currentTaxi.passengers.forEach(p => p.assigned = false);
+                    remaindersPool.push(...currentTaxi.passengers);
                 }
             });
 
-            let finalizedTaxis = [];
-            let currentTaxi = { passengers: [], stops: new Set() };
+            // PHASE 2: MIXED AREA REMAINDERS (Spillover pool to ensure nobody is left behind)
+            let mixedStopsMap = {};
+            remaindersPool.forEach(p => {
+                if (!mixedStopsMap[p.displayStop]) mixedStopsMap[p.displayStop] = [];
+                mixedStopsMap[p.displayStop].push(p);
+            });
+            let sortedMixedStopNames = Object.keys(mixedStopsMap).sort((a, b) => {
+                return MASTER_ROUTE_SEQUENCE.indexOf(a) - MASTER_ROUTE_SEQUENCE.indexOf(b);
+            });
 
-            // PHASE 2: GEOGRAPHIC ROLLING SPILLOVER ENGINE (The Natural Human Method)
-            for (let i = 0; i < geoGroups.length; i++) {
-                let group = geoGroups[i];
+            let mixedTaxi = { passengers: [], stops: new Set() };
+            sortedMixedStopNames.forEach(stopName => {
+                let stopPass = mixedStopsMap[stopName];
+                
+                while (stopPass.length > 0) {
+                    let space = TAXI_CAPACITY - mixedTaxi.passengers.length;
+                    let addsNewStop = !mixedTaxi.stops.has(stopName);
+                    let exceedsStops = addsNewStop && mixedTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
 
-                while (group.passengers.length > 0) {
-                    let space = TAXI_CAPACITY - currentTaxi.passengers.length;
-
-                    // If taxi is full, dispatch it
-                    if (space === 0) {
-                        finalizedTaxis.push(currentTaxi);
-                        currentTaxi = { passengers: [], stops: new Set() };
+                    if (space === 0 || exceedsStops) {
+                        finalizedTaxis.push(mixedTaxi);
+                        mixedTaxi = { passengers: [], stops: new Set() };
                         space = TAXI_CAPACITY;
+                        if (exceedsStops) continue;
                     }
 
-                    // Enforce Stop Limit
-                    let addsNewStop = !currentTaxi.stops.has(group.name);
-                    if (addsNewStop && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT) {
-                        finalizedTaxis.push(currentTaxi);
-                        currentTaxi = { passengers: [], stops: new Set() };
-                        space = TAXI_CAPACITY;
-                    }
-
-                    if (group.passengers.length <= space) {
-                        // The entire group fits perfectly. Take them all, keep them whole.
-                        let chunk = group.passengers.splice(0, group.passengers.length);
-                        chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                        currentTaxi.stops.add(group.name);
+                    if (stopPass.length <= space) {
+                        let chunk = stopPass.splice(0, stopPass.length);
+                        chunk.forEach(p => { p.assigned = true; mixedTaxi.passengers.push(p); });
+                        mixedTaxi.stops.add(stopName);
                     } else {
-                        // The group DOES NOT fit. We face the human split decision.
-                        if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
-                            // The taxi is "good enough" (14, 15, or 16). SPARE the new group from being split!
-                            // Dispatch the taxi early.
-                            finalizedTaxis.push(currentTaxi);
-                            currentTaxi = { passengers: [], stops: new Set() };
-                            // The while loop will trigger again, placing this whole group into the fresh taxi.
+                        if (mixedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                            finalizedTaxis.push(mixedTaxi);
+                            mixedTaxi = { passengers: [], stops: new Set() };
                         } else {
-                            // The taxi is too empty. We are FORCED to split the new group to ensure efficiency.
-                            let chunk = group.passengers.splice(0, space);
-                            chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                            currentTaxi.stops.add(group.name);
-                            
-                            finalizedTaxis.push(currentTaxi);
-                            currentTaxi = { passengers: [], stops: new Set() };
+                            let chunk = stopPass.splice(0, space);
+                            chunk.forEach(p => { p.assigned = true; mixedTaxi.passengers.push(p); });
+                            mixedTaxi.stops.add(stopName);
+                            finalizedTaxis.push(mixedTaxi);
+                            mixedTaxi = { passengers: [], stops: new Set() };
                         }
                     }
                 }
-            }
+            });
 
-            // PHASE 3: DISPATCH THE FINAL TAIL-END TAXI (No one left behind)
-            if (currentTaxi.passengers.length > 0) {
-                finalizedTaxis.push(currentTaxi);
+            // PHASE 3: THE FINAL LIMBO RULE
+            // The absolute final mixed taxi is evaluated.
+            if (mixedTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                finalizedTaxis.push(mixedTaxi);
+            } else if (mixedTaxi.passengers.length > 0) {
+                // These specific passengers are not enough to fill a new taxi (< 14) and are too much for current taxis.
+                // Therefore, they are sent to Limbo exactly per your rules.
+                mixedTaxi.passengers.forEach(p => p.assigned = false);
             }
 
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
@@ -501,6 +561,10 @@
                 
                 let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
                 
+                if (uniqueStopsInTaxiSet.has("Unknown")) {
+                    orderedSequenceForTaxi.push("Unknown");
+                }
+
                 let routePlanStrings = [];
                 orderedSequenceForTaxi.forEach(sName => {
                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
@@ -557,7 +621,6 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
-            // The Limbo Box acts solely as a safety net for corrupted mapping data now, not for minimums.
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -580,11 +643,11 @@
 
                 limboDiv.innerHTML = `
                     <div class="limbo-header-trigger" onclick="toggleLimboView()">
-                        <div class="limbo-title">⚠️ Data Mapping Errors <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— ${globalLimboPassengers.length} unresolved</span></div>
+                        <div class="limbo-title">⚠️ Unassigned Passengers <span style="font-weight:normal; font-size:0.95rem; color:#475569;">— ${globalLimboPassengers.length} in Limbo</span></div>
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These passengers could not be processed due to missing location data or severe mapping failures.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These stops are unassigned because they are not enough to fill a new taxi (under 14 people) and there is no space left in the current active taxis without splitting groups.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
