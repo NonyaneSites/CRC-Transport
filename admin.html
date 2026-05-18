@@ -416,7 +416,7 @@
 
             let finalizedTaxis = [];
 
-            // PHASE 1: FILL DIRECT ANCHORS (GROUPS OF EXACT 17 FROM A SINGLE Hub like Braam)
+            // PHASE 1: FILL DIRECT ANCHORS (GROUPS OF EXACT 17 FROM A SINGLE Hub)
             MASTER_ROUTE_SEQUENCE.forEach(stopName => {
                 let stopPassengers = workingPool.filter(p => p.displayStop === stopName);
                 while (stopPassengers.length >= TAXI_CAPACITY) {
@@ -446,47 +446,67 @@
                 remainingGroups.push({ stopName: "Unknown", passengers: remainingUnknown });
             }
 
-            // PHASE 3: GREEDY LOOKAHEAD ALLOCATION (PREVENTS SPLITS BY SKIPPING TO SMALLER STOPS)
-            while(remainingGroups.length > 0) {
+            // PHASE 3: GEOGRAPHIC CHUNKING ENGINE (ANTI-SPLIT & STOP MINIMIZATION)
+            while (remainingGroups.length > 0) {
                 let currentTaxi = { passengers: [] };
+                let currentStops = new Set();
                 let i = 0;
 
-                while (i < remainingGroups.length && currentTaxi.passengers.length < TAXI_CAPACITY) {
+                while (i < remainingGroups.length) {
                     let group = remainingGroups[i];
                     let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    let addsNewStop = !currentStops.has(group.stopName);
+                    let willExceedStops = addsNewStop && currentStops.size >= MAX_UNIQUE_STOPS_LIMIT;
 
-                    // Does the ENTIRE stop group fit into the available seats?
-                    if (group.passengers.length <= seatsAvailable) {
-                        group.passengers.forEach(p => {
-                            p.assigned = true;
-                            currentTaxi.passengers.push(p);
+                    // Does the entire group fit cleanly without violating the 8-stop rule?
+                    if (group.passengers.length <= seatsAvailable && !willExceedStops) {
+                        group.passengers.forEach(p => { 
+                            p.assigned = true; 
+                            currentTaxi.passengers.push(p); 
                         });
-                        remainingGroups.splice(i, 1); // Remove it completely, don't increment i
+                        currentStops.add(group.stopName);
+                        remainingGroups.splice(i, 1); // Remove from list, DO NOT increment index 'i'
                     } else {
-                        // The group is too big. Skip it to keep it whole, look down the route for a smaller group.
-                        i++;
+                        // The group does not fit perfectly, OR exceeds the stop limit.
+                        // CHECK: Is our taxi already sufficiently packed?
+                        if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                            // Yes. Finalize this taxi now. This prevents skipping ahead and minimizes stops.
+                            break; 
+                        } else {
+                            // No, it's under 14. We must skip this group and look ahead for a smaller one to fill seats.
+                            i++;
+                        }
                     }
                 }
 
-                // EMERGENCY SPLIT PROTOCOL:
-                // If after sweeping all groups, the taxi couldn't even reach 14 people
-                // AND there are still groups left on the route, we are forced to split the next group.
+                // EMERGENCY SPLIT PROTOCOL (Absolute Last Resort)
+                // If we swept the whole route, skipped the big groups, and the taxi STILL hasn't reached 14...
                 if (currentTaxi.passengers.length < MIN_PASSENGER_FLOOR && remainingGroups.length > 0) {
-                    let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    let targetGroup = remainingGroups[0]; 
+                    // Find the safest group to split (preferably a stop we already visited)
+                    let targetIndex = remainingGroups.findIndex(g => currentStops.has(g.stopName) || currentStops.size < MAX_UNIQUE_STOPS_LIMIT);
+                    if (targetIndex === -1) targetIndex = 0; // Fallback to whatever is available
 
-                    let splitChunk = targetGroup.passengers.splice(0, seatsAvailable);
-                    splitChunk.forEach(p => {
-                        p.assigned = true;
-                        currentTaxi.passengers.push(p);
+                    let targetGroup = remainingGroups[targetIndex];
+                    let seatsAvailable = TAXI_CAPACITY - currentTaxi.passengers.length;
+                    
+                    let amountToTake = Math.min(seatsAvailable, targetGroup.passengers.length);
+                    let splitChunk = targetGroup.passengers.splice(0, amountToTake);
+                    
+                    splitChunk.forEach(p => { 
+                        p.assigned = true; 
+                        currentTaxi.passengers.push(p); 
                     });
-                    // targetGroup retains its leftover passengers for the next taxi round
+                    currentStops.add(targetGroup.stopName);
+                    
+                    if (targetGroup.passengers.length === 0) {
+                        remainingGroups.splice(targetIndex, 1);
+                    }
                 }
 
                 finalizedTaxis.push(currentTaxi);
             }
 
-            // PHASE 4: FILTER UNDERSIZED TAXIS TO LIMBO
+            // PHASE 4: FILTER UNDERSIZED TAXIS (End of night leftovers) TO LIMBO
             finalizedTaxis = finalizedTaxis.filter(taxi => {
                 if (taxi.passengers.length >= MIN_PASSENGER_FLOOR) {
                     return true;
