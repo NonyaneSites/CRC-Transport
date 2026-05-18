@@ -37,7 +37,6 @@
             flex-direction: column;
         }
 
-        /* Updated Theme Banner Line */
         .theme-banner {
             background: linear-gradient(90deg, #991b1b 0%, #dc2626 50%, #991b1b 100%);
             color: white;
@@ -58,22 +57,28 @@
             box-sizing: border-box;
         }
 
-        /* Branding Header Component with Church Graphics */
         .church-header {
             text-align: center;
             margin-bottom: 28px;
         }
-        .church-header .logo-frame {
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, #dc2626, #7f1d1d);
-            border-radius: 50%;
+        
+        .logo-container {
+            margin: 0 auto 16px auto;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 14px auto;
-            box-shadow: 0 0 20px rgba(220, 38, 36, 0.4);
+            min-height: 65px;
         }
+        
+        .church-logo {
+            max-height: 85px; 
+            max-width: 100%;
+            width: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            filter: drop-shadow(0px 4px 12px rgba(220, 38, 36, 0.25));
+        }
+
         .church-header h1 {
             font-size: 2rem;
             font-weight: 900;
@@ -232,7 +237,6 @@
             line-height: 1.4;
         }
 
-        /* Stylized Action Notice Container for Time and Cash demands */
         .action-notice-card {
             background: #fff5f5;
             border: 1.5px solid #fee2e2;
@@ -267,7 +271,7 @@
             margin: 0;
             font-size: 0.88rem;
             color: #7f1d1d;
-            line-height: 1.42;
+            line-height: 1.45;
         }
 
         .secondary-btn {
@@ -295,11 +299,8 @@
 <div class="container">
 
     <div class="church-header">
-        <div class="logo-frame">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v6M10 4h4M12 8L3 14v8h18v-8z"/>
-                <path d="M10 22v-5a2 2 0 0 1 4 0v5"/>
-            </svg>
+        <div class="logo-container">
+            <img src="CRC.jpeg" alt="CRC Logo" class="church-logo">
         </div>
         <h1>CRC <span>Johannesburg</span></h1>
         <p>Sunday Shuttle Logistics</p>
@@ -396,14 +397,14 @@
                 <div class="notice-icon">⏰</div>
                 <div>
                     <strong>Ready by 6:00 AM Sharp</strong>
-                    <p>Shuttles depart strictly on schedule to facilitate church service setup. Please be waiting at your specific pickup spot early.</p>
+                    <p>Shuttles depart strictly on schedule to facilitate church service setup. Please ensure you are waiting at your specific pickup spot early.</p>
                 </div>
             </div>
             <div class="notice-row">
                 <div class="notice-icon">💵</div>
                 <div>
                     <strong>R40 Cash Payment Required</strong>
-                    <p>Digital banking details have been disabled. You must pay your R40 transport contribution directly in cash to your vehicle coordinator when onboarding.</p>
+                    <p>Please bring exact change and pay your R40 transport contribution directly in cash to your vehicle coordinator when onboarding.</p>
                 </div>
             </div>
             <div class="notice-row">
@@ -414,10 +415,11 @@
                 </div>
             </div>
             <div class="notice-row" style="border: none; padding: 0;">
-                <div class="notice-icon">🆔</div>
+                <div class="notice-icon">🚨</div>
                 <div>
-                    <strong>Manifest Verification Code</strong>
-                    <p id="paymentRef" style="font-weight: 700; color: #1e293b; margin-top: 2px; font-family: monospace; font-size: 1rem; letter-spacing: 0.05em;">Name</p>
+                    <strong>Strict No-Show Policy</strong>
+                    <p>Once registered, resources are provisioned for your seat. <strong>Even if you cannot show up to your stop on Sunday, the R40 contribution still needs to be paid as soon as possible.</strong> Please speak directly to a Transport Ministry Representative to settle your balance.</p>
+                    <span id="paymentRef" style="display: none;"></span>
                 </div>
             </div>
         </div>
@@ -428,7 +430,6 @@
 </div>
 
 <script>
-    // 1. EXECUTE DATE OPERATION FIRST AT THE ABSOLUTE TOP SO IT NEVER GETS BLOCKED BY CDN FAILURES
     function calculateUpcomingSunday() {
         try {
             let today = new Date();
@@ -446,7 +447,6 @@
     }
     calculateUpcomingSunday();
 
-    // 2. SAFELY INITIALIZE DATABASE CLIENT INFRASTRUCTURE
     const SUPABASE_URL = "https://btdghwdrbkernrufmnsl.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_P4t4Ogqjz4KCAf7Rvt9ctg_kgw5USx-";
     let churchDb = null;
@@ -455,13 +455,12 @@
         if (typeof supabase !== 'undefined') {
             churchDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         } else {
-            console.warn("Database library could not be fetched. Check connectivity or adblockers.");
+            console.warn("Database library could not be fetched.");
         }
     } catch(dbInitError) {
         console.error("Database connection configuration aborted:", dbInitError);
     }
 
-    // FIXED STRINGS MATRIX ALIGNED TO STABLE HISTORICAL VALUES
     const STOPS_DATA = {
         "CBD": ["Ghandi Square", "Maboneng", "Urban Circle", "DFC Bus Stop", "The Fields", "Saratoga", "Gateway", "Focus 1", "Focus 2"],
         "Parktown": ["Campus Central on Empire", "Argyle", "Junction", "Arteria", "Education Campus", "Charlotte Maxeke", "EOH", "Knockando", "Yale", "Stanley Avenue"],
