@@ -411,141 +411,75 @@
                 return { ...r, assigned: false, sourceArea: mappedArea, displayStop: displayStop };
             });
 
-            let stopMap = {};
-            workingPool.forEach(p => {
-                if (!stopMap[p.displayStop]) {
-                    stopMap[p.displayStop] = { stopName: p.displayStop, passengers: [] };
-                }
-                stopMap[p.displayStop].passengers.push(p);
-            });
-
-            // PHASE 1: IDENTIFY THE UNIVERSAL LIQUID HUB (The biggest stop, usually Braam)
-            let liquidHubName = null;
-            let maxCount = 0;
-            Object.values(stopMap).forEach(s => {
-                if (s.passengers.length > maxCount) {
-                    maxCount = s.passengers.length;
-                    liquidHubName = s.stopName;
-                }
-            });
-
-            let liquidPool = [];
-            if (liquidHubName) {
-                liquidPool = stopMap[liquidHubName].passengers;
-                delete stopMap[liquidHubName];
-            }
-
-            // PHASE 2: EXTRACT EXACT 17s FROM THE SOLID ROCKS 
-            let solidGroups = [];
+            // PHASE 1: PREPARE GEOGRAPHIC GROUPS
+            let geoGroups = [];
             MASTER_ROUTE_SEQUENCE.forEach(stopName => {
-                if (stopMap[stopName] && stopMap[stopName].passengers.length > 0) {
-                    solidGroups.push({ name: stopName, passengers: stopMap[stopName].passengers });
+                let passengersAtStop = workingPool.filter(r => r.displayStop === stopName && !r.assigned);
+                if (passengersAtStop.length > 0) {
+                    geoGroups.push({ name: stopName, passengers: passengersAtStop });
                 }
             });
 
             let finalizedTaxis = [];
-            for (let i = 0; i < solidGroups.length; i++) {
-                while (solidGroups[i].passengers.length >= TAXI_CAPACITY) {
-                    let chunk = solidGroups[i].passengers.splice(0, TAXI_CAPACITY);
-                    chunk.forEach(p => p.assigned = true);
-                    finalizedTaxis.push({ passengers: chunk, stops: new Set([solidGroups[i].name]) });
-                }
-                if (solidGroups[i].passengers.length === 0) {
-                    solidGroups.splice(i, 1);
-                    i--;
-                }
-            }
-
-            // PHASE 3: THE UNIVERSAL HUB TOP-OFF SWEEP (Prevents Splits, Preserves Route)
             let currentTaxi = { passengers: [], stops: new Set() };
 
-            while (solidGroups.length > 0) {
-                // Sequential Route Addition
-                for (let i = 0; i < solidGroups.length; i++) {
-                    let group = solidGroups[i];
-                    let seatsLeft = TAXI_CAPACITY - currentTaxi.passengers.length;
-                    let addsNewStop = !currentTaxi.stops.has(group.name);
-                    let exceedsStops = addsNewStop && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
-                    
-                    if (group.passengers.length <= seatsLeft && !exceedsStops) {
-                        group.passengers.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                        currentTaxi.stops.add(group.name);
-                        solidGroups.splice(i, 1);
-                        i--; // Adjust index
-                        if (currentTaxi.passengers.length === TAXI_CAPACITY) break;
-                    } else {
-                        // Geographic wall hit. Do not look ahead yet. Do not split.
-                        break; 
+            // PHASE 2: GEOGRAPHIC ROLLING SPILLOVER ENGINE (The Natural Human Method)
+            for (let i = 0; i < geoGroups.length; i++) {
+                let group = geoGroups[i];
+
+                while (group.passengers.length > 0) {
+                    let space = TAXI_CAPACITY - currentTaxi.passengers.length;
+
+                    // If taxi is full, dispatch it
+                    if (space === 0) {
+                        finalizedTaxis.push(currentTaxi);
+                        currentTaxi = { passengers: [], stops: new Set() };
+                        space = TAXI_CAPACITY;
                     }
-                }
-                
-                // Top-off from the Universal Hub
-                let needed = TAXI_CAPACITY - currentTaxi.passengers.length;
-                if (needed > 0 && liquidPool.length > 0) {
-                    let take = Math.min(needed, liquidPool.length);
-                    let chunk = liquidPool.splice(0, take);
-                    chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                    currentTaxi.stops.add(liquidHubName);
-                }
-                
-                // Lookahead Scan (Only if Liquid runs dry and taxi is dangerously empty)
-                if (currentTaxi.passengers.length < MIN_PASSENGER_FLOOR && solidGroups.length > 0) {
-                    for (let i = 0; i < solidGroups.length; i++) {
-                        let group = solidGroups[i];
-                        let seatsLeft = TAXI_CAPACITY - currentTaxi.passengers.length;
-                        let addsNewStop = !currentTaxi.stops.has(group.name);
-                        let exceedsStops = addsNewStop && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT;
-                        
-                        if (group.passengers.length <= seatsLeft && !exceedsStops) {
-                            group.passengers.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+
+                    // Enforce Stop Limit
+                    let addsNewStop = !currentTaxi.stops.has(group.name);
+                    if (addsNewStop && currentTaxi.stops.size >= MAX_UNIQUE_STOPS_LIMIT) {
+                        finalizedTaxis.push(currentTaxi);
+                        currentTaxi = { passengers: [], stops: new Set() };
+                        space = TAXI_CAPACITY;
+                    }
+
+                    if (group.passengers.length <= space) {
+                        // The entire group fits perfectly. Take them all, keep them whole.
+                        let chunk = group.passengers.splice(0, group.passengers.length);
+                        chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
+                        currentTaxi.stops.add(group.name);
+                    } else {
+                        // The group DOES NOT fit. We face the human split decision.
+                        if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) {
+                            // The taxi is "good enough" (14, 15, or 16). SPARE the new group from being split!
+                            // Dispatch the taxi early.
+                            finalizedTaxis.push(currentTaxi);
+                            currentTaxi = { passengers: [], stops: new Set() };
+                            // The while loop will trigger again, placing this whole group into the fresh taxi.
+                        } else {
+                            // The taxi is too empty. We are FORCED to split the new group to ensure efficiency.
+                            let chunk = group.passengers.splice(0, space);
+                            chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
                             currentTaxi.stops.add(group.name);
-                            solidGroups.splice(i, 1);
-                            i--;
-                            if (currentTaxi.passengers.length >= MIN_PASSENGER_FLOOR) break;
+                            
+                            finalizedTaxis.push(currentTaxi);
+                            currentTaxi = { passengers: [], stops: new Set() };
                         }
                     }
                 }
-                
-                // Absolute Emergency Split (If absolutely forced by mathematics)
-                if (currentTaxi.passengers.length < MIN_PASSENGER_FLOOR && solidGroups.length > 0) {
-                    let target = solidGroups[0];
-                    let take = Math.min(TAXI_CAPACITY - currentTaxi.passengers.length, target.passengers.length);
-                    let chunk = target.passengers.splice(0, take);
-                    chunk.forEach(p => { p.assigned = true; currentTaxi.passengers.push(p); });
-                    currentTaxi.stops.add(target.name);
-                    if (target.passengers.length === 0) solidGroups.splice(0, 1);
-                }
-                
+            }
+
+            // PHASE 3: DISPATCH THE FINAL TAIL-END TAXI (No one left behind)
+            if (currentTaxi.passengers.length > 0) {
                 finalizedTaxis.push(currentTaxi);
-                currentTaxi = { passengers: [], stops: new Set() };
-            }
-
-            // PHASE 4: Clean up any remaining Universal Hub people
-            while (liquidPool.length > 0) {
-                let take = Math.min(TAXI_CAPACITY, liquidPool.length);
-                let chunk = liquidPool.splice(0, take);
-                chunk.forEach(p => p.assigned = true);
-                finalizedTaxis.push({ passengers: chunk, stops: new Set([liquidHubName]) });
-            }
-
-            // PHASE 5: Aggressively combine any sparse tail-end taxis to save drivers
-            for (let i = 0; i < finalizedTaxis.length; i++) {
-                for (let j = i + 1; j < finalizedTaxis.length; j++) {
-                    let t1 = finalizedTaxis[i];
-                    let t2 = finalizedTaxis[j];
-                    let combinedStops = new Set([...t1.stops, ...t2.stops]);
-                    if (t1.passengers.length + t2.passengers.length <= TAXI_CAPACITY && combinedStops.size <= MAX_UNIQUE_STOPS_LIMIT) {
-                        t2.passengers.forEach(p => t1.passengers.push(p));
-                        combinedStops.forEach(s => t1.stops.add(s));
-                        finalizedTaxis.splice(j, 1);
-                        j--;
-                    }
-                }
             }
 
             let globalLimboPassengers = workingPool.filter(p => !p.assigned);
             let globalTaxiCounter = 1;
 
+            // UI LOGISTICS MONITOR DISPLAY COMPILATION GENERATION
             finalizedTaxis.forEach(taxi => {
                 let runningGlobalId = globalTaxiCounter++;
                 const vehicleBlockElement = document.createElement('div');
@@ -567,10 +501,6 @@
                 
                 let orderedSequenceForTaxi = getCustomRouteSequence(Array.from(uniqueStopsInTaxiSet));
                 
-                if (uniqueStopsInTaxiSet.has("Unknown")) {
-                    orderedSequenceForTaxi.push("Unknown");
-                }
-
                 let routePlanStrings = [];
                 orderedSequenceForTaxi.forEach(sName => {
                     if (countSummaryMap[sName]) routePlanStrings.push(`${sName} (${countSummaryMap[sName]} p)`);
@@ -627,6 +557,7 @@
                 manifestContainer.appendChild(vehicleBlockElement);
             });
 
+            // The Limbo Box acts solely as a safety net for corrupted mapping data now, not for minimums.
             if (globalLimboPassengers.length > 0) {
                 const limboDiv = document.createElement('div');
                 limboDiv.className = 'limbo-block';
@@ -653,7 +584,7 @@
                         <div class="toggle-status-badge" id="limbo-toggle-badge" style="background:#fca5a5; color:#9f1239;">▼ Show List</div>
                     </div>
                     <div class="limbo-collapsible-content" id="limbo-content-block">
-                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These passengers could not be assigned to a vehicle because of corrupted location data or mapping failures.</p>
+                        <p style="font-size:0.85rem; margin-top:0; color:#475569; margin-bottom:15px;">These passengers could not be processed due to missing location data or severe mapping failures.</p>
                         <div style="max-width:100%; overflow-x:auto; background:white; border-radius:8px; border:1px solid #fecdd3;">
                             <table>
                                 <thead>
